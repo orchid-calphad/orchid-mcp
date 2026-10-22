@@ -1,6 +1,6 @@
 """ORCHID MCP server.
 
-Uses the official MCP Python SDK (``pip install mcp``; FastMCP) when it is
+Uses the official MCP Python SDK (``pip install mcp``; MCPServer in mcp 2.x, FastMCP in 1.x) when it is
 installed. Without it, ``--transport stdio`` falls back to a small built-in
 JSON-RPC 2.0 implementation of the MCP stdio protocol (tools, resources,
 prompts), so the server still works in a bare Python environment.
@@ -9,12 +9,13 @@ prompts), so the server still works in a bare Python environment.
 from __future__ import annotations
 
 import argparse
+import functools
 import inspect
 import json
 import sys
 import types
 import typing
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from . import __version__
 from .datasource import DataSourceError
@@ -27,6 +28,8 @@ INSTRUCTIONS = (
     "and OQMD formation energies, and the TDB catalog. Every value carries its citation, DOI, page and quote; "
     "report them, and cite ORCHID plus the original sources (see the cite_orchid prompt)."
 )
+
+Fields = Literal["summary", "full"]
 
 _ORCHID: Orchid | None = None
 
@@ -46,11 +49,19 @@ def _call(fn: Callable[..., dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------- tools
-def search_systems(elements: list[str] | None = None, text: str | None = None, exact: bool = False, limit: int = 50) -> dict:
+def search_systems(
+    elements: list[str] | None = None,
+    text: str | None = None,
+    exact: bool = False,
+    limit: int = 50,
+    offset: int = 0,
+    fields: Fields = "summary",
+) -> dict:
     """Find chemical systems in ORCHID. elements: e.g. ["Al","Ni"] (systems containing all of them; exact=true for
     exactly them). text: matches system names and titles/citations of reporting papers. Returns per-system counts
-    by evidence class and property group, calculated assessments, and viewer URLs."""
-    return _call(orchid().search_systems, elements=elements, text=text, exact=exact, limit=limit)
+    by evidence class and the calculated assessments; fields="full" adds property-group counts, assessment
+    citations/DOIs and viewer URLs. Paginate with offset; `total` is the number of matching systems."""
+    return _call(orchid().search_systems, elements=elements, text=text, exact=exact, limit=limit, offset=offset, fields=fields)
 
 
 def get_system_data(
@@ -58,16 +69,19 @@ def get_system_data(
     property_group: str | None = None,
     evidence_class: str | None = None,
     accepted_only: bool = True,
-    limit: int = 200,
+    limit: int = 50,
     offset: int = 0,
     property: str | None = None,
+    fields: Fields = "summary",
     compact: bool = False,
 ) -> dict:
     """Literature values for a system (e.g. "Al-Ni"). Filters: property_group (invariant reaction, phase transition,
     phase equilibrium, formation, mixing / partial, heat capacity / entropy / enthalpy, activity / EMF / Gibbs
     energy, crystal structure, model expression, other property), property code (HM_FORM, CPM, ...), evidence_class
-    (experimental|model|dft|unspecified). Each value carries source citation, DOI, page, quote or table locator,
-    evidence class, origin, flags and uncertainty basis. Paginate with offset."""
+    (experimental|model|dft|unspecified). Paginate with limit/offset (default 50); `total` counts all matches.
+    fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page,
+    quote <= 240 chars or table locator) or "full" (every field with expanded provenance: locator, origin, flags,
+    uncertainty, conditions, cited sources, model link; compact=true then drops pipeline bookkeeping)."""
     return _call(
         orchid().get_system_data,
         system=system,
@@ -77,38 +91,76 @@ def get_system_data(
         limit=limit,
         offset=offset,
         property=property,
+        fields=fields,
         compact=compact,
     )
 
 
-def get_invariant_reactions(system: str, source: str = "both", assessment: str | None = None, accepted_only: bool = True) -> dict:
+def get_invariant_reactions(
+    system: str,
+    source: str = "both",
+    assessment: str | None = None,
+    accepted_only: bool = True,
+    limit: int = 50,
+    offset: int = 0,
+    fields: Fields = "summary",
+) -> dict:
     """Invariant reactions of a system: literature records (source="literature"), invariants calculated from each
-    SGTE assessment (source="calculated"), or both side by side with phase-set matches and dT."""
-    return _call(orchid().get_invariant_reactions, system=system, source=source, assessment=assessment, accepted_only=accepted_only)
+    SGTE assessment (source="calculated"), or both side by side with phase-set matches and dT. Calculated
+    invariants are matched against all literature records; the literature list is paged with limit/offset
+    (literature_total counts all).
+    fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page,
+    quote <= 240 chars or table locator) or "full" (complete provenance)."""
+    return _call(
+        orchid().get_invariant_reactions,
+        system=system,
+        source=source,
+        assessment=assessment,
+        accepted_only=accepted_only,
+        limit=limit,
+        offset=offset,
+        fields=fields,
+    )
 
 
-def get_formation_enthalpy(formula: str, accepted_only: bool = True, include_higher_order_systems: bool = True) -> dict:
+def get_formation_enthalpy(
+    formula: str, accepted_only: bool = True, include_higher_order_systems: bool = True, fields: Fields = "summary"
+) -> dict:
     """Formation enthalpy of a compound (e.g. "Al3Ni"): literature values in kJ/mol-atom with provenance,
-    Materials Project and OQMD DFT entries at that composition, and per-evidence-class / per-source summaries."""
+    Materials Project and OQMD DFT entries at that composition, and per-evidence-class / per-source summaries.
+    fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page,
+    quote <= 240 chars or table locator) or "full" (complete provenance)."""
     return _call(
         orchid().get_formation_enthalpy,
         formula=formula,
         accepted_only=accepted_only,
         include_higher_order_systems=include_higher_order_systems,
+        fields=fields,
     )
 
 
-def get_phase_diagram(system: str, assessment: str | None = None, x: float | None = None, T: float | None = None) -> dict:
-    """Calculated binary phase diagram(s): TDB file, SHA-256, assessment citation/DOI, invariants, region summary,
-    viewer URL. assessment: TDB name (e.g. "AlNi-05Mie") or DOI; omit for all. With x (mole fraction of the
-    diagram's x_component) and T (K): the stable phases at the nearest stored grid node."""
-    return _call(orchid().get_phase_diagram, system=system, assessment=assessment, x=x, T=T)
+def get_phase_diagram(
+    system: str, assessment: str | None = None, x: float | None = None, T: float | None = None, fields: Fields = "summary"
+) -> dict:
+    """Calculated binary phase diagram(s): TDB file, SHA-256, assessment citation/DOI, phases, invariants, viewer
+    URL. assessment: TDB name (e.g. "AlNi-05Mie") or DOI; omit for all. With x (mole fraction of the diagram's
+    x_component) and T (K): the stable phases at the nearest stored grid node. fields="full" adds the per-region
+    boundary summary and grid metadata."""
+    return _call(orchid().get_phase_diagram, system=system, assessment=assessment, x=x, T=T, fields=fields)
 
 
-def list_tdb_files(elements: list[str] | None = None, exact: bool = False, tier: str | None = None, limit: int = 200) -> dict:
+def list_tdb_files(
+    elements: list[str] | None = None,
+    exact: bool = False,
+    tier: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    fields: Fields = "summary",
+) -> dict:
     """TDB catalog entries for systems containing all `elements` (exact=true: exactly them). tier: bundled |
-    fetched | manual. Returns licence, licence status, source URL and, for bundled files, the ORCHID download URL."""
-    return _call(orchid().list_tdb_files, elements=elements, exact=exact, tier=tier, limit=limit)
+    fetched | manual. Returns name, elements, tier, licence, licence status, source URL, SHA-256 and, for bundled
+    files, the ORCHID download URL; fields="full" returns the whole catalog entry. Paginate with offset."""
+    return _call(orchid().list_tdb_files, elements=elements, exact=exact, tier=tier, limit=limit, offset=offset, fields=fields)
 
 
 def get_tdb(file: str, include_content: bool = True) -> dict:
@@ -123,10 +175,12 @@ def get_paper(doi: str) -> dict:
     return _call(orchid().get_paper, doi=doi)
 
 
-def compare_to_dft(system: str, default_subset_only: bool = False) -> dict:
+def compare_to_dft(system: str, default_subset_only: bool = False, fields: Fields = "summary") -> dict:
     """Literature formation enthalpies vs Materials Project vs OQMD for the compounds of a system, with residuals
-    (DFT - literature), MAE over the default experimental subset, and the DFT hull vertices of both sources."""
-    return _call(orchid().compare_to_dft, system=system, default_subset_only=default_subset_only)
+    (DFT - literature), MAE over the default experimental subset, and the DFT hull vertices of both sources.
+    fields: "summary" (default; per literature value: id, value, evidence class, accepted, phase, T, citation, DOI,
+    page, quote <= 240 chars, table, residuals) or "full" (method, cited sources, flags, DFT point details)."""
+    return _call(orchid().compare_to_dft, system=system, default_subset_only=default_subset_only, fields=fields)
 
 
 TOOLS: list[Callable[..., dict]] = [
@@ -156,6 +210,8 @@ def _schema_for(tp: Any) -> dict[str, Any]:
         non_none = [a for a in args if a is not type(None)]
         inner = _schema_for(non_none[0]) if len(non_none) == 1 else {}
         return {"anyOf": [inner, {"type": "null"}]} if type(None) in args else inner
+    if origin is typing.Literal:
+        return {"type": "string", "enum": list(args)}
     if origin is list:
         return {"type": "array", "items": _schema_for(args[0]) if args else {}}
     return {str: {"type": "string"}, int: {"type": "integer"}, float: {"type": "number"}, bool: {"type": "boolean"}}.get(tp, {})
@@ -183,29 +239,80 @@ def tool_descriptions() -> list[dict[str, Any]]:
 
 
 # ------------------------------------------------------- official SDK path
-def build_fastmcp(host: str = "127.0.0.1", port: int = 8000) -> Any:
-    from mcp.server.fastmcp import FastMCP  # lazy: optional dependency
+def _sdk_server_class() -> tuple[Any, int]:
+    """The official SDK's high-level server class and its major API generation.
 
-    server = FastMCP(SERVER_NAME, instructions=INSTRUCTIONS, host=host, port=port)
+    mcp >= 2 renamed ``FastMCP`` to ``MCPServer`` (host/port moved to ``run``);
+    mcp 1.x is still accepted.
+    """
+    try:
+        from mcp.server.mcpserver import MCPServer  # mcp >= 2
+
+        return MCPServer, 2
+    except ImportError:
+        from mcp.server.fastmcp import FastMCP  # mcp 1.x
+
+        return FastMCP, 1
+
+
+def _raising(fn: Callable[..., dict], gen: int) -> Callable[..., str]:
+    """Wrap a tool for the SDK: an ``{"error": ...}`` result becomes a tool error (``isError: true``), and a
+    result is returned as one compact JSON text block (the SDK would otherwise indent it, ~25% larger)."""
+    if gen >= 2:
+        from mcp.server.mcpserver.exceptions import ToolError
+    else:
+        from mcp.server.fastmcp.exceptions import ToolError
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> str:
+        result = fn(*args, **kwargs)
+        if isinstance(result, dict) and "error" in result:
+            raise ToolError(result["error"])
+        return json.dumps(result, ensure_ascii=False)
+
+    wrapper.__annotations__ = {**typing.get_type_hints(fn), "return": str}
+    return wrapper
+
+
+def build_fastmcp(host: str = "127.0.0.1", port: int = 8000) -> Any:
+    """Build the server on the official MCP SDK (MCPServer in mcp 2.x, FastMCP in 1.x)."""
+    cls, gen = _sdk_server_class()
+    if gen >= 2:
+        server = cls(SERVER_NAME, instructions=INSTRUCTIONS, version=__version__)
+    else:
+        server = cls(SERVER_NAME, instructions=INSTRUCTIONS, host=host, port=port)
+    server._orchid_http = {"host": host, "port": port, "gen": gen}
     for fn in TOOLS:
-        server.tool()(fn)
+        server.tool(structured_output=False)(_raising(fn, gen))
     for uri, (key, desc, mime) in RESOURCES.items():
 
-        def _make(k: str) -> Callable[[], str]:
+        def _make(k: str, d: str) -> Callable[[], str]:
             def read() -> str:
                 return orchid().resource_text(k)
 
             read.__name__ = f"resource_{k.replace('-', '_')}"
-            read.__doc__ = desc
+            read.__doc__ = d
             return read
 
-        server.resource(uri, name=key, description=desc, mime_type=mime)(_make(key))
+        server.resource(uri, name=key, description=desc, mime_type=mime)(_make(key, desc))
 
     @server.prompt(name="cite_orchid", description="How to cite ORCHID and the original sources of each value")
     def cite_orchid(topic: str = "") -> str:
         return cite_orchid_prompt(topic)
 
     return server
+
+
+def run_sdk(server: Any, transport: str) -> None:
+    """Run an SDK server on stdio or streamable HTTP (bound to the host/port given to build_fastmcp)."""
+    if transport == "stdio":
+        server.run(transport="stdio")
+        return
+    cfg = server._orchid_http
+    if cfg["gen"] >= 2:
+        server.run(transport="streamable-http", host=cfg["host"], port=cfg["port"])
+    else:
+        server.run(transport="streamable-http")
 
 
 # --------------------------------------------------- built-in stdio fallback
@@ -311,7 +418,7 @@ def run_fallback_stdio(stdin: Any = None, stdout: Any = None) -> None:
 
 def sdk_available() -> bool:
     try:
-        import mcp.server.fastmcp  # noqa: F401
+        _sdk_server_class()
     except ImportError:
         return False
     return True
@@ -329,10 +436,10 @@ def main(argv: list[str] | None = None) -> int:
         if not sdk_available():
             print("streamable HTTP needs the MCP SDK: pip install mcp", file=sys.stderr)
             return 2
-        build_fastmcp(args.host, args.port).run(transport="streamable-http")
+        run_sdk(build_fastmcp(args.host, args.port), "http")
         return 0
     if sdk_available() and not args.fallback:
-        build_fastmcp().run(transport="stdio")
+        run_sdk(build_fastmcp(), "stdio")
     else:
         run_fallback_stdio()
     return 0

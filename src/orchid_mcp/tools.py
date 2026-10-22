@@ -29,6 +29,76 @@ DFT_LAYERS = {
     "oqmd": {"dir": "hulls/dft-oqmd", "label": "OQMD"},
 }
 _COMPACT_DROP = {"readers", "reader_tier", "tool_release", "value_stored", "unit_stored", "link_rule", "pid", "elements"}
+FIELDS = ("summary", "full")
+_TDB_SUMMARY = (
+    "name", "elements", "category", "tier", "license", "license_status", "source_url", "orchid_download_url", "sha256",
+)
+QUOTE_MAX = 240
+FIELDS_NOTE = (
+    "fields='summary': id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page and a "
+    "quote shortened to 240 characters (table values: the table locator). Use fields='full' (or the ids) for "
+    "complete provenance: locator, origin, flags, uncertainty, conditions, cited sources and model links."
+)
+
+
+def _check_fields(fields: str) -> str:
+    f = (fields or "summary").strip().lower()
+    if f not in FIELDS:
+        raise OrchidError(f"fields must be one of {FIELDS}")
+    return f
+
+
+def _short(text: Any, n: int = QUOTE_MAX) -> Any:
+    if not isinstance(text, str) or len(text) <= n:
+        return text
+    return text[: n - 1].rstrip() + "\u2026"
+
+
+def _phase_labels(phases: Any) -> list[str]:
+    out = []
+    for ph in phases or []:
+        if not isinstance(ph, dict):
+            out.append(str(ph))
+            continue
+        lab, mp = ph.get("label"), ph.get("model_phase")
+        out.append(f"{lab} ({mp})" if lab and mp and mp != lab else (lab or mp or "?"))
+    return out
+
+
+def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
+    """Short form of an expanded literature record (see FIELDS_NOTE)."""
+    src = r.get("source") or {}
+    loc = r.get("locator") or {}
+    t = r.get("temperature_K")
+    if t is None and r.get("unit") == "K":
+        t = r.get("value")
+    out: dict[str, Any] = {
+        "id": r.get("id"),
+        "property": r.get("property"),
+        "value": r.get("value"),
+        "unit": r.get("unit"),
+        "T_K": t,
+        "phases": _phase_labels(r.get("phases")),
+    }
+    rx = r.get("reaction")
+    if isinstance(rx, dict) and (rx.get("type") or rx.get("printed")):
+        out["reaction"] = ": ".join(str(x) for x in (rx.get("type"), rx.get("printed")) if x)
+    out.update(
+        {
+            "evidence_class": r.get("evidence_class"),
+            "accepted": bool((r.get("flags") or {}).get("extraction_accepted")),
+            "citation": src.get("citation"),
+            "doi": src.get("doi"),
+            "page": src.get("page"),
+            "quote": _short(src.get("quote")),
+        }
+    )
+    if src.get("quote") is None and isinstance(loc, dict) and loc.get("label") is not None:
+        kind = loc.get("artifact") or "table"
+        out["table"] = f"{kind} {loc.get('label')}" + (f", row {loc['row']}" if loc.get("row") is not None else "")
+    return out
+
+
 _FILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+\-]*$")
 
 CITE_TEXT = (
@@ -200,6 +270,8 @@ class Orchid:
         text: str | None = None,
         exact: bool = False,
         limit: int = 50,
+        offset: int = 0,
+        fields: str = "summary",
     ) -> dict[str, Any]:
         """Find chemical systems with literature data and/or calculated phase diagrams.
 
@@ -207,6 +279,7 @@ class Orchid:
         ``text``: case-insensitive match on the system name or on titles/citations of
         papers reporting that system.
         """
+        fields = _check_fields(fields)
         want: set[str] = set()
         try:
             want = {element(e) for e in elements or []}
@@ -250,8 +323,28 @@ class Orchid:
                 }
             )
         rows.sort(key=lambda r: (len(r["elements"]), -r["literature_accepted"], -r["calculated_phase_diagrams"], r["system"]))
+        page = rows[max(0, offset) : max(0, offset) + max(1, limit)]
+        if fields == "summary":
+            page = [
+                {
+                    "system": r["system"],
+                    "literature_accepted": r["literature_accepted"],
+                    "by_evidence_class": r["by_evidence_class"],
+                    "calculated_phase_diagrams": r["calculated_phase_diagrams"],
+                    "assessments": [a["tdb"] for a in r["assessments"]],
+                }
+                for r in page
+            ]
         return self._wrap(
-            {"query": {"elements": sorted(want), "text": text, "exact": exact}, "total": len(rows), "systems": rows[: max(1, limit)]}
+            {
+                "query": {"elements": sorted(want), "text": text, "exact": exact},
+                "fields": fields,
+                "total": len(rows),
+                "offset": offset,
+                "returned": len(page),
+                "truncated": offset + len(page) < len(rows),
+                "systems": page,
+            }
         )
 
     def get_system_data(
@@ -260,17 +353,21 @@ class Orchid:
         property_group: str | None = None,
         evidence_class: str | None = None,
         accepted_only: bool = True,
-        limit: int = 200,
+        limit: int = 50,
         offset: int = 0,
         property: str | None = None,
         compact: bool = False,
+        fields: str = "summary",
     ) -> dict[str, Any]:
-        """Literature values for one system, each with full provenance.
+        """Literature values for one system.
 
+        ``fields='summary'`` (default) returns the short form of ``summarize_record``;
+        ``fields='full'`` the complete record with expanded provenance, where
         ``compact=True`` drops only extraction-pipeline bookkeeping (readers, tool release,
         pre-normalisation copies); citation, DOI, page, quote, locator, evidence class,
         origin, flags, uncertainty and model link are always kept.
         """
+        fields = _check_fields(fields)
         sid = self._sys(system)
         doc = self._system_doc(sid)
         if doc is None:
@@ -292,7 +389,10 @@ class Orchid:
             sel.append(rec)
         page = sel[max(0, offset) : max(0, offset) + max(1, min(limit, 2000))]
         values = [self._expand(r, doc) for r in page]
-        if compact:
+        contexts = self._contexts_for(values, doc)
+        if fields == "summary":
+            values = [summarize_record(r) for r in values]
+        elif compact:
             values = [{k: v for k, v in r.items() if k not in _COMPACT_DROP} for r in values]
         groups: dict[str, int] = {}
         for r in sel:
@@ -306,14 +406,18 @@ class Orchid:
                     "evidence_class": evidence_class,
                     "accepted_only": accepted_only,
                 },
+                "fields": fields,
+                "total": len(sel),
                 "total_matching": len(sel),
                 "returned": len(values),
                 "offset": offset,
                 "truncated": offset + len(values) < len(sel),
+                "next_offset": offset + len(values) if offset + len(values) < len(sel) else None,
                 "matching_by_property_group": groups,
                 "values": values,
-                "contexts": self._contexts_for(values, doc),
+                "contexts": contexts,
                 "explorer_url": f"{SITE_URL}data-explorer/#{sid}",
+                **({"fields_note": FIELDS_NOTE} if fields == "summary" else {}),
             }
         )
 
@@ -422,9 +526,18 @@ class Orchid:
         }
 
     def get_phase_diagram(
-        self, system: str, assessment: str | None = None, x: float | None = None, T: float | None = None
+        self,
+        system: str,
+        assessment: str | None = None,
+        x: float | None = None,
+        T: float | None = None,
+        fields: str = "summary",
     ) -> dict[str, Any]:
-        """Calculated binary phase diagram(s) of a system; optionally the stable phases at (x, T)."""
+        """Calculated binary phase diagram(s) of a system; optionally the stable phases at (x, T).
+
+        ``fields='summary'`` omits the per-region boundary summary and grid metadata (``fields='full'``).
+        """
+        fields = _check_fields(fields)
         sid = self._sys(system)
         entries = self._pick(sid, assessment)
         if not entries:
@@ -435,10 +548,14 @@ class Orchid:
             s = self._diagram_summary({**e, "system": sid}, doc)
             if x is not None and T is not None:
                 s["phase_at"] = self._grid_phase(doc, float(x), float(T))
+            if fields == "summary":
+                for k in ("regions_summary", "grid", "collection", "assessment_url"):
+                    s.pop(k, None)
             out.append(s)
         return self._wrap(
             {
                 "system": sid,
+                "fields": fields,
                 "n_assessments": len(out),
                 "assessments": out,
                 "note": "Each assessment is a separate CALPHAD model; results are never averaged across assessments.",
@@ -446,9 +563,21 @@ class Orchid:
         )
 
     def get_invariant_reactions(
-        self, system: str, source: str = "both", assessment: str | None = None, accepted_only: bool = True
+        self,
+        system: str,
+        source: str = "both",
+        assessment: str | None = None,
+        accepted_only: bool = True,
+        limit: int = 50,
+        offset: int = 0,
+        fields: str = "summary",
     ) -> dict[str, Any]:
-        """Literature invariant reactions and calculated invariants (per assessment), side by side."""
+        """Literature invariant reactions and calculated invariants (per assessment), side by side.
+
+        Calculated invariants are matched against all literature invariants; the literature list
+        itself is paged (``limit``/``offset``) and shortened with ``fields='summary'``.
+        """
+        fields = _check_fields(fields)
         if source not in ("literature", "calculated", "both"):
             raise OrchidError("source must be 'literature', 'calculated' or 'both'")
         sid = self._sys(system)
@@ -463,8 +592,15 @@ class Orchid:
                     if rec.get("observation_type") == "invariant_reaction" or rec.get("property_group") == "invariant reaction":
                         lit_recs.append(self._expand(rec, doc))
                 lit_recs.sort(key=lambda r: -(_f(r.get("value")) or 0))
-                result["contexts"] = self._contexts_for(lit_recs, doc)
-            result["literature"] = lit_recs
+                page = lit_recs[max(0, offset) : max(0, offset) + max(1, limit)]
+                result["contexts"] = self._contexts_for(page, doc)
+            else:
+                page = []
+            result["fields"] = fields
+            result["literature_total"] = len(lit_recs)
+            result["literature_offset"] = offset
+            result["literature_truncated"] = offset + len(page) < len(lit_recs)
+            result["literature"] = [summarize_record(r) for r in page] if fields == "summary" else page
         if source in ("calculated", "both"):
             calc = []
             for e in self._pick(sid, assessment):
@@ -488,8 +624,19 @@ class Orchid:
                             v = _f(r.get("value"))
                             if v is None:
                                 continue
-                            best.append({"id": r["id"], "evidence_class": r.get("evidence_class"), "T_K": v, "dT_K": round(v - inv["T"], 2)})
+                            best.append(
+                                {
+                                    "id": r["id"],
+                                    "evidence_class": r.get("evidence_class"),
+                                    "T_K": v,
+                                    "dT_K": round(v - inv["T"], 2),
+                                    "doi": (r.get("source") or {}).get("doi"),
+                                    "page": (r.get("source") or {}).get("page"),
+                                }
+                            )
                         best.sort(key=lambda b: abs(b["dT_K"]))
+                        if fields == "summary":
+                            best = [{k: b[k] for k in ("id", "evidence_class", "T_K", "dT_K")} for b in best[:3]]
                         item["literature_matches"] = best[:5]
                     invs.append(item)
                 calc.append(
@@ -562,9 +709,14 @@ class Orchid:
         return out
 
     def get_formation_enthalpy(
-        self, formula: str, accepted_only: bool = True, include_higher_order_systems: bool = True
+        self,
+        formula: str,
+        accepted_only: bool = True,
+        include_higher_order_systems: bool = True,
+        fields: str = "summary",
     ) -> dict[str, Any]:
         """Formation enthalpy of a compound: literature values (kJ/mol-atom) and MP / OQMD DFT values."""
+        fields = _check_fields(fields)
         comp = parse_formula(formula)
         if comp is None:
             raise OrchidError(f"cannot parse {formula!r} as a single multi-element formula (e.g. 'Al3Ni')")
@@ -610,8 +762,9 @@ class Orchid:
                 "composition": comp,
                 "system": sid,
                 "unit": "kJ/mol-atom",
-                "literature": lit,
-                "literature_other_units": other_units,
+                "fields": fields,
+                "literature": [summarize_record(r) for r in lit] if fields == "summary" else lit,
+                "literature_other_units": [summarize_record(r) for r in other_units] if fields == "summary" else other_units,
                 "dft": dft,
                 "summary": summary,
                 "summary_rule": (
@@ -663,8 +816,9 @@ class Orchid:
     def _parity(self) -> dict[str, Any]:
         return self.data.read_json("literature/dft_parity.json")
 
-    def compare_to_dft(self, system: str, default_subset_only: bool = False) -> dict[str, Any]:
+    def compare_to_dft(self, system: str, default_subset_only: bool = False, fields: str = "summary") -> dict[str, Any]:
         """Literature formation enthalpies vs Materials Project vs OQMD for one system."""
+        fields = _check_fields(fields)
         sid = self._sys(system)
         par = self._parity()
         if self._parity_by_sys is None:
@@ -747,6 +901,23 @@ class Orchid:
                 )
                 if in_default and _f(p.get("res")) is not None:
                     resid[p["src"]].append(float(p["res"]))
+            if fields == "summary":
+                full = c["literature"][-1]
+                c["literature"][-1] = {
+                    "id": full["id"],
+                    "value_kJ_per_mol_atom": full["value_kJ_per_mol_atom"],
+                    "evidence_class": full["evidence_class"],
+                    "in_default_subset": full["in_default_subset"],
+                    "accepted": full["extraction_accepted"],
+                    "phase": full["phase"],
+                    "T_K": full["temperature_K"],
+                    "citation": full["citation"],
+                    "doi": full["doi"],
+                    "page": full["page"],
+                    "quote": _short(full["quote"]),
+                    "table": full["table"],
+                    "residual_dft_minus_lit": {d["source"]: d["residual_dft_minus_lit"] for d in full["dft_points"]},
+                }
         stats = {}
         for src, rs in resid.items():
             if rs:
@@ -776,6 +947,7 @@ class Orchid:
             {
                 "system": sid,
                 "unit": "kJ/mol-atom",
+                "fields": fields,
                 "compounds": sorted(compounds.values(), key=lambda c: c["formula"]),
                 "residual_stats_default_subset": stats,
                 "dft_hull_vertices": hull_vertices,
@@ -815,9 +987,16 @@ class Orchid:
         return out
 
     def list_tdb_files(
-        self, elements: list[str] | None = None, exact: bool = False, tier: str | None = None, limit: int = 200
+        self,
+        elements: list[str] | None = None,
+        exact: bool = False,
+        tier: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        fields: str = "summary",
     ) -> dict[str, Any]:
         """TDB catalog entries whose system contains all ``elements`` (``exact``: exactly them)."""
+        fields = _check_fields(fields)
         try:
             want = {element(x) for x in elements or []}
         except ChemError as exc:
@@ -835,8 +1014,14 @@ class Orchid:
         return self._wrap(
             {
                 "query": {"elements": sorted(want), "exact": exact, "tier": tier},
+                "fields": fields,
                 "total": len(rows),
-                "files": rows[: max(1, limit)],
+                "offset": offset,
+                "truncated": offset + max(1, limit) < len(rows),
+                "files": [
+                    {k: r.get(k) for k in _TDB_SUMMARY} if fields == "summary" else r
+                    for r in rows[max(0, offset) : max(0, offset) + max(1, limit)]
+                ],
                 "tiers": {
                     "bundled": "redistributable; served by ORCHID",
                     "fetched": "public upstream download, not redistributed here",

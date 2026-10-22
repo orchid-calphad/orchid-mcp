@@ -9,11 +9,13 @@ JSON files at `data.orchid-project.org` (`openapi/openapi.yaml`).
 ## Install
 
 ```bash
-pip install -e '.[mcp]'        # with the official MCP Python SDK (recommended)
-pip install -e .               # stdlib only: built-in stdio fallback server, no HTTP mode
+python3.13 -m venv .venv                 # a dedicated environment (git-ignored)
+.venv/bin/pip install -e '.[mcp]'        # with the official MCP Python SDK, pinned to mcp==2.3.0 (recommended)
+.venv/bin/pip install -e .               # stdlib only: built-in stdio fallback server, no HTTP mode
 ```
 
-The package itself has no runtime dependencies. If the `mcp` SDK is installed, the server runs on FastMCP; otherwise
+The package itself has no runtime dependencies. If the `mcp` SDK is installed, the server runs on it (`MCPServer` in
+mcp 2.x, tested with 2.3.0; `FastMCP` in mcp 1.x is also supported); otherwise
 `orchid-mcp` serves the MCP stdio protocol (tools, resources, prompts) with a small built-in JSON-RPC loop.
 Streamable HTTP (`--transport http`) needs `pip install mcp`.
 
@@ -39,6 +41,12 @@ orchid-mcp --transport http --port 8000      # streamable HTTP at http://127.0.0
 ### Claude Code
 
 ```bash
+# as installed on the Mac Studio: user scope, offline, from local checkouts, using the dedicated venv
+claude mcp add --scope user orchid \
+  -e ORCHID_DATA_DIR=$HOME/projects/orchid-data \
+  -e ORCHID_SITE_DATA_DIR=$HOME/projects/orchid-project.org/data \
+  -- $HOME/projects/orchid-mcp/.venv/bin/orchid-mcp
+
 # online (data fetched from data.orchid-project.org and cached)
 claude mcp add orchid -- orchid-mcp
 # offline, from local checkouts
@@ -74,14 +82,35 @@ Omit `env` to use the online data.
 
 | tool | returns |
 |---|---|
-| `search_systems(elements, text, exact, limit)` | systems with value counts by evidence class / property group, calculated assessments, viewer URLs |
-| `get_system_data(system, property_group, evidence_class, accepted_only=True, limit=200, offset, property, compact)` | literature values with full records and an expanded `source` (citation, DOI, page, quote or table locator) |
-| `get_invariant_reactions(system, source="literature"\|"calculated"\|"both", assessment)` | literature invariants and calculated invariants per SGTE assessment, with exact phase-set matches and dT |
-| `get_formation_enthalpy(formula)` | literature HM_FORM (kJ/mol-atom) + Materials Project and OQMD entries at that composition + per-class summaries |
-| `get_phase_diagram(system, assessment, x, T)` | TDB file, SHA-256, assessment citation/DOI, invariants, region summary, viewer URL; stable phases at (x, T) from the stored grid |
-| `list_tdb_files(elements, exact, tier)` / `get_tdb(file)` | catalog entry, licence, tier, SHA-256, download URL; file content **only** for bundled, confirmed-licence files |
+| `search_systems(elements, text, exact, limit=50, offset, fields)` | systems with value counts by evidence class and calculated assessments (`full`: property groups, citations, viewer URLs) |
+| `get_system_data(system, property_group, evidence_class, accepted_only=True, limit=50, offset, property, fields, compact)` | literature values; `full`: complete records with an expanded `source` (citation, DOI, page, quote or table locator) |
+| `get_invariant_reactions(system, source="literature"\|"calculated"\|"both", assessment, limit=50, offset, fields)` | literature invariants (paged) and calculated invariants per SGTE assessment, with exact phase-set matches and dT |
+| `get_formation_enthalpy(formula, fields)` | literature HM_FORM (kJ/mol-atom) + Materials Project and OQMD entries at that composition + per-class summaries |
+| `get_phase_diagram(system, assessment, x, T, fields)` | TDB file, SHA-256, assessment citation/DOI, phases, invariants, viewer URL (`full`: region summary, grid); stable phases at (x, T) from the stored grid |
+| `list_tdb_files(elements, exact, tier, limit=50, offset, fields)` / `get_tdb(file)` | licence, tier, SHA-256, download URL (`full`: whole catalog entry); file content **only** for bundled, confirmed-licence files |
 | `get_paper(doi)` | bibliographic record, systems, number of values, experimental-context items with quotes |
-| `compare_to_dft(system)` | literature vs MP vs OQMD formation enthalpies with residuals and the DFT hull vertices |
+| `compare_to_dft(system, fields)` | literature vs MP vs OQMD formation enthalpies with residuals and the DFT hull vertices |
+
+### Response size: `fields` and paging
+
+List-returning tools default to `fields="summary"`. A summary literature value carries `id`, `property`, `value`,
+`unit`, `T_K`, `phases`, `reaction` (invariants), `evidence_class`, `accepted`, `citation`, `doi`, `page` and a
+`quote` shortened to 240 characters, or `table` (label and row) for table values. `fields="full"` returns the
+complete record with all provenance (locator, origin, flags, uncertainty, conditions, cited sources, model link).
+Paged tools report `total`, `offset`, `returned`/`truncated` and (for `get_system_data`) `next_offset`. With the
+SDK, results are sent as one compact JSON text block.
+
+CU-ZR, bytes of JSON per call (0.1.0 defaults → current defaults):
+
+| call | before | after |
+|---|---:|---:|
+| `get_system_data("CU-ZR")` (200 full → 50 summary, of 792) | 521,405 | 23,234 |
+| `get_invariant_reactions("CU-ZR")` (all 420 literature + 11 assessments) | 1,294,212 | 83,218 |
+| `get_phase_diagram("CU-ZR")` (11 assessments) | 108,883 | 38,958 |
+| `compare_to_dft("CU-ZR")` | 86,015 | 37,597 |
+| `get_formation_enthalpy("CuZr2")` | 51,940 | 15,140 |
+| `search_systems(["Cu"])` | 47,947 | 12,135 |
+| `list_tdb_files(["Cu","Zr"])` | 20,874 | 10,294 |
 
 Resources: `orchid://schema` (SCHEMA.md), `orchid://dataset-card` (README + CITATION.cff), `orchid://licence`
 (LICENSES.md + NOTICE.md). Prompt: `cite_orchid` (how to cite ORCHID and the original sources).
@@ -109,11 +138,12 @@ and, on `https://orchid-project.org/data`, `/catalog.json` and `/databases/{coll
 ## Tests
 
 ```bash
-pip install pytest pyyaml
-ORCHID_TEST_DATA_DIR=~/projects/orchid-data ORCHID_TEST_SITE_DATA_DIR=~/projects/orchid-project.org/data pytest
+.venv/bin/pip install -e '.[mcp,test]'
+ORCHID_TEST_DATA_DIR=~/projects/orchid-data ORCHID_TEST_SITE_DATA_DIR=~/projects/orchid-project.org/data .venv/bin/python -m pytest
 ```
 
-Tests read local data only; network access fails the run.
+Tests read local data only; network access fails the run. The stdio smoke test runs against both the built-in
+fallback and the SDK server (skipped if `mcp` is not installed).
 
 ## Licence
 
