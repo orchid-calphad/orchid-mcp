@@ -14,7 +14,7 @@ keywords = ["CALPHAD", "MCP", "thermodynamics", "phase diagrams", "TDB"]
 dependencies = []
 
 [project.optional-dependencies]
-mcp = ["mcp>=1.10"]
+mcp = ["mcp==2.3.0"]  # tested release; the code also runs on mcp 1.x (FastMCP)
 test = ["pytest", "pyyaml"]
 
 [project.scripts]

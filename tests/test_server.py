@@ -17,6 +17,9 @@ def test_tool_schemas():
     assert set(tools) == EXPECTED
     assert tools["get_system_data"]["inputSchema"]["required"] == ["system"]
     assert tools["search_systems"]["inputSchema"]["properties"]["elements"]["anyOf"][0]["type"] == "array"
+    fields = tools["get_system_data"]["inputSchema"]["properties"]["fields"]
+    assert fields["enum"] == ["summary", "full"] and fields["default"] == "summary"
+    assert tools["get_system_data"]["inputSchema"]["properties"]["limit"]["default"] == 50
 
 
 def _rpc(proc, mid, method, params=None):
