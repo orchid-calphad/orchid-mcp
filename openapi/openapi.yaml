@@ -1,0 +1,870 @@
+openapi: 3.1.0
+info:
+  title: ORCHID static data API
+  version: "2026-10-22"
+  summary: Read-only JSON files of the ORCHID CALPHAD data release, served as static files.
+  description: |
+    ORCHID (Open Repository for CALPHAD Hypotheses, Intelligence, and Discovery) publishes its data as static files.
+    This document describes that file layout as a read-only HTTP API: every operation is a plain `GET` of a file;
+    there are no query parameters, no authentication and no write operations.
+
+    * `https://data.orchid-project.org/` — literature values, calculated phase diagrams, DFT and CALPHAD hulls.
+    * `https://orchid-project.org/data/` — the TDB catalog and the redistributable (bundled) TDB files.
+
+    Field definitions follow `literature/SCHEMA.md` (served at `/literature/SCHEMA.md`) and the hull interval schema
+    (`BINARY_HULLS.md` in the open-tdb repository).
+
+    **Identifiers.** A chemical system `{system}` is the alphabetically sorted, uppercase element symbols joined by
+    `-` (e.g. `AL-NI`, `AL-CO-CR-NI`). Binary hull paths use `{A}` and `{B}` with `A < B` alphabetically.
+
+    **Licence.** Derived data CC BY 4.0: cite ORCHID (see `CITATION.cff`, Zenodo DOI per release) and the original
+    source of each value (paper citation/DOI, CALPHAD assessment, Materials Project, OQMD). Each literature `quote`
+    is a single sentence reproduced under fair use for verification; source papers are not redistributed. TDB files
+    keep their own licences (catalog `license` field); only `tier: bundled` files are served.
+  license:
+    name: CC BY 4.0 (data); MIT (catalog and code)
+    url: https://creativecommons.org/licenses/by/4.0/
+  contact:
+    name: ORCHID
+    url: https://orchid-project.org
+servers:
+  - url: https://data.orchid-project.org
+    description: ORCHID data release (literature, phase diagrams, hulls)
+tags:
+  - name: literature
+    description: Values read from published papers, with evidence class and provenance.
+  - name: phase-diagrams
+    description: Binary phase diagrams calculated with pycalphad from the SGTE binary collection.
+  - name: hulls
+    description: Binary convex hulls (Materials Project, OQMD, CALPHAD isotherms).
+  - name: catalog
+    description: TDB catalog and bundled TDB files (served from orchid-project.org/data).
+  - name: release
+    description: Dataset card, citation and licence files.
+
+paths:
+  /README.md:
+    get:
+      tags: [release]
+      operationId: getDatasetCard
+      summary: Dataset card
+      responses:
+        "200": { $ref: "#/components/responses/Markdown" }
+  /CITATION.cff:
+    get:
+      tags: [release]
+      operationId: getCitation
+      summary: Citation File Format record
+      responses:
+        "200":
+          description: CFF (YAML)
+          content:
+            text/plain: { schema: { type: string } }
+  /LICENSES.md:
+    get:
+      tags: [release]
+      operationId: getLicences
+      summary: Licence of each folder
+      responses:
+        "200": { $ref: "#/components/responses/Markdown" }
+  /NOTICE.md:
+    get:
+      tags: [release]
+      operationId: getNotice
+      summary: Attributions, citations and statements of changes for third-party data
+      responses:
+        "200": { $ref: "#/components/responses/Markdown" }
+
+  /literature/index.json:
+    get:
+      tags: [literature]
+      operationId: getLiteratureIndex
+      summary: Release info, totals and per-system counts
+      responses:
+        "200":
+          description: Literature index
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LiteratureIndex" }
+  /literature/SCHEMA.md:
+    get:
+      tags: [literature]
+      operationId: getLiteratureSchema
+      summary: Field reference for all literature files
+      responses:
+        "200": { $ref: "#/components/responses/Markdown" }
+  /literature/systems/{file}:
+    get:
+      tags: [literature]
+      operationId: getLiteratureSystem
+      summary: All literature values of one chemical system
+      description: |
+        `{file}` is `{system}.json`, or `{system}.part2.json`, ... for large systems (the parts are listed in
+        `index.json` → `systems[{system}].files`). Records are compact: `locator.ref` is a key of `artifacts` and
+        `model` a key of `models`.
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[A-Z]{1,2}(-[A-Z]{1,2})*(\\.part[0-9]+)?\\.json$" }
+          example: AL-NI.json
+      responses:
+        "200":
+          description: System file
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SystemFile" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /literature/papers.json:
+    get:
+      tags: [literature]
+      operationId: getPapers
+      summary: Paper id → bibliographic record
+      responses:
+        "200":
+          description: Papers
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { $ref: "#/components/schemas/Paper" }
+  /literature/contexts.json:
+    get:
+      tags: [literature]
+      operationId: getContexts
+      summary: Paper id → experimental-context items (samples, treatments, measurements)
+      responses:
+        "200":
+          description: Contexts
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { $ref: "#/components/schemas/Context" }
+  /literature/dft_parity.json:
+    get:
+      tags: [literature]
+      operationId: getDftParity
+      summary: Literature formation enthalpies paired with Materials Project and OQMD
+      responses:
+        "200":
+          description: DFT parity data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DftParity" }
+  /literature/orchid-literature.jsonl.gz:
+    get:
+      tags: [literature]
+      operationId: getLiteratureJsonl
+      summary: All records, one full JSON record per line (gzip)
+      responses:
+        "200":
+          description: gzip-compressed JSON Lines; each line is a Record with `locator` and `model` expanded
+          content:
+            application/gzip: { schema: { type: string, format: binary } }
+  /literature/orchid-literature.csv.gz:
+    get:
+      tags: [literature]
+      operationId: getLiteratureCsv
+      summary: All records flattened to CSV (gzip); nested fields are compact JSON strings
+      responses:
+        "200":
+          description: gzip-compressed CSV
+          content:
+            application/gzip: { schema: { type: string, format: binary } }
+
+  /phase-diagrams/index.json:
+    get:
+      tags: [phase-diagrams]
+      operationId: getPhaseDiagramIndex
+      summary: Calculated diagrams per system (one per assessment)
+      responses:
+        "200":
+          description: Phase-diagram index
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhaseDiagramIndex" }
+  /phase-diagrams/sgte/{file}:
+    get:
+      tags: [phase-diagrams]
+      operationId: getPhaseDiagram
+      summary: One calculated binary phase diagram
+      parameters:
+        - name: file
+          in: path
+          required: true
+          description: "`file` from phase-diagrams/index.json (the TDB name with `.json`)"
+          schema: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9._+-]*\\.json$" }
+          example: AlNi-05Mie.json
+      responses:
+        "200":
+          description: Phase diagram
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhaseDiagram" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /hulls/{layer}/catalog.json:
+    get:
+      tags: [hulls]
+      operationId: getHullCatalog
+      summary: Summary and provenance of one hull layer
+      parameters:
+        - $ref: "#/components/parameters/HullLayer"
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+  /hulls/{layer}/elements.json:
+    get:
+      tags: [hulls]
+      operationId: getHullElements
+      summary: Elemental reference entries of a DFT layer
+      parameters:
+        - name: layer
+          in: path
+          required: true
+          schema: { type: string, enum: [dft-mp, dft-oqmd] }
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+  /hulls/dft-mp/{A}/{A}-{B}.json:
+    get:
+      tags: [hulls]
+      operationId: getHullMp
+      summary: Materials Project convex hull of binary A-B (0 K, eV/atom)
+      parameters:
+        - $ref: "#/components/parameters/A"
+        - $ref: "#/components/parameters/B"
+      responses:
+        "200":
+          description: Hull document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HullDocument" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /hulls/dft-oqmd/{A}/{A}-{B}.json:
+    get:
+      tags: [hulls]
+      operationId: getHullOqmd
+      summary: OQMD convex hull of binary A-B (fitted elemental references; not energy-comparable to MP)
+      parameters:
+        - $ref: "#/components/parameters/A"
+        - $ref: "#/components/parameters/B"
+      responses:
+        "200":
+          description: Hull document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HullDocument" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /hulls/dft-mp/entries/{A}/{A}-{B}.json:
+    get:
+      tags: [hulls]
+      operationId: getHullEntriesMp
+      summary: Materials Project entries above the hull (within the layer's window)
+      parameters:
+        - $ref: "#/components/parameters/A"
+        - $ref: "#/components/parameters/B"
+      responses:
+        "200":
+          description: Above-hull entries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HullEntries" }
+  /hulls/dft-oqmd/entries/{A}/{A}-{B}.json:
+    get:
+      tags: [hulls]
+      operationId: getHullEntriesOqmd
+      summary: OQMD entries above the hull (within the layer's window)
+      parameters:
+        - $ref: "#/components/parameters/A"
+        - $ref: "#/components/parameters/B"
+      responses:
+        "200":
+          description: Above-hull entries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HullEntries" }
+  /hulls/calphad-sgte/{A}/{A}-{B}.json:
+    get:
+      tags: [hulls]
+      operationId: getHullCalphad
+      summary: Assessed CALPHAD isotherm hull of A-B (298.15 K, J/mol-atoms), default assessment
+      parameters:
+        - $ref: "#/components/parameters/A"
+        - $ref: "#/components/parameters/B"
+      responses:
+        "200":
+          description: Hull document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HullDocument" }
+  /hulls/calphad-sgte/{A}/{A}-{B}--{assessment}.json:
+    get:
+      tags: [hulls]
+      operationId: getHullCalphadAssessment
+      summary: CALPHAD isotherm hull of A-B for one assessment (TDB name without extension)
+      parameters:
+        - $ref: "#/components/parameters/A"
+        - $ref: "#/components/parameters/B"
+        - name: assessment
+          in: path
+          required: true
+          schema: { type: string }
+          example: AlNi-05Mie
+      responses:
+        "200":
+          description: Hull document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HullDocument" }
+
+  /catalog.json:
+    servers:
+      - url: https://orchid-project.org/data
+    get:
+      tags: [catalog]
+      operationId: getTdbCatalog
+      summary: TDB catalog, one record per database
+      responses:
+        "200":
+          description: Catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CatalogEntry" }
+  /catalog.csv:
+    servers:
+      - url: https://orchid-project.org/data
+    get:
+      tags: [catalog]
+      operationId: getTdbCatalogCsv
+      summary: TDB catalog as CSV
+      responses:
+        "200":
+          description: CSV
+          content:
+            text/csv: { schema: { type: string } }
+  /databases/{collection}/{file}:
+    servers:
+      - url: https://orchid-project.org/data
+    get:
+      tags: [catalog]
+      operationId: getTdbFile
+      summary: A bundled (redistributable) TDB file
+      description: |
+        The path equals the catalog entry's `local_path`. Only `tier: bundled` files with
+        `license_status: confirmed` exist here; `fetched` and `manual` entries are obtained from their original
+        sources (`download_url` / `source_url`). Cite the assessment and keep the file's own licence.
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema: { type: string, enum: [sgte-binary, binder, mendeley, openiec, pycalphad, scheil, zenodo] }
+        - name: file
+          in: path
+          required: true
+          schema: { type: string }
+          example: AlNi-05Mie.tdb
+      responses:
+        "200":
+          description: TDB text (bytes preserved; often ASCII/Latin-1)
+          content:
+            text/plain: { schema: { type: string } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /croissant.json:
+    servers:
+      - url: https://orchid-project.org/data
+    get:
+      tags: [release]
+      operationId: getCroissant
+      summary: Croissant (ML dataset) metadata
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+
+components:
+  parameters:
+    A:
+      name: A
+      in: path
+      required: true
+      description: First element, uppercase; alphabetically before B
+      schema: { type: string, pattern: "^[A-Z]{1,2}$" }
+      example: AL
+    B:
+      name: B
+      in: path
+      required: true
+      description: Second element, uppercase; alphabetically after A
+      schema: { type: string, pattern: "^[A-Z]{1,2}$" }
+      example: NI
+    HullLayer:
+      name: layer
+      in: path
+      required: true
+      schema: { type: string, enum: [dft-mp, dft-oqmd, calphad-sgte] }
+
+  responses:
+    NotFound:
+      description: No such file (system or assessment not in the release)
+    Markdown:
+      description: Markdown text
+      content:
+        text/markdown: { schema: { type: string } }
+    AnyJson:
+      description: JSON document
+      content:
+        application/json: { schema: { type: object } }
+
+  schemas:
+    EvidenceClass:
+      type: string
+      enum: [experimental, model, dft, unspecified, assessed_phase_diagram]
+      description: Never mixed or averaged. `model` = from a CALPHAD/thermodynamic model; `dft` = first-principles.
+    Composition:
+      type: object
+      description: Element (uppercase) → mole fraction
+      additionalProperties: { type: number }
+
+    LiteratureIndex:
+      type: object
+      required: [release, systems, totals]
+      properties:
+        release: { type: string }
+        licence:
+          type: object
+          properties:
+            derived_data: { type: string, example: CC BY 4.0 }
+            quotes: { type: string }
+            source_papers: { type: string }
+        schema: { type: string }
+        files: { type: object, additionalProperties: { type: string } }
+        totals: { type: object }
+        systems:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/SystemSummary" }
+    SystemSummary:
+      type: object
+      properties:
+        n: { type: integer }
+        accepted: { type: integer }
+        elements: { type: array, items: { type: string } }
+        files: { type: array, items: { type: string }, description: "paths relative to /literature/" }
+        phase_diagram: { type: boolean }
+        by_evidence_class: { type: object, additionalProperties: { type: integer } }
+        by_property_group: { type: object, additionalProperties: { type: integer } }
+        by_record_kind: { type: object, additionalProperties: { type: integer } }
+
+    SystemFile:
+      type: object
+      required: [system, elements, records]
+      properties:
+        system: { type: string, example: AL-NI }
+        elements: { type: array, items: { type: string } }
+        release: { type: string }
+        licence: { type: string }
+        note: { type: string }
+        part: { type: integer }
+        parts: { type: integer }
+        records: { type: array, items: { $ref: "#/components/schemas/Record" } }
+        artifacts:
+          type: object
+          description: locator.ref → table or text passage
+          additionalProperties: { $ref: "#/components/schemas/Artifact" }
+        models:
+          type: object
+          description: model key → TDB link
+          additionalProperties: { $ref: "#/components/schemas/ModelLink" }
+        papers:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/Paper" }
+        contexts:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/Context" }
+
+    Record:
+      type: object
+      description: One literature value. See SCHEMA.md "Record fields".
+      required: [id, system, property, evidence_class, paper, flags]
+      properties:
+        id: { type: string, example: ORC-4UH3IOKV6C }
+        pid: { type: string, description: "paper / page / table or passage / row" }
+        system: { type: string }
+        elements: { type: array, items: { type: string } }
+        record_kind: { type: string, enum: [invariant_table, general_table, running_text] }
+        observation_type:
+          type: string
+          enum: [invariant_reaction, phase_transition, equilibrium_property, structural_property,
+                 phase_region_vertex_set, phase_assemblage_node, property_expression]
+        property: { type: string, example: HM_FORM }
+        property_group: { type: string }
+        property_printed: { type: string }
+        value: { type: [number, "null"] }
+        unit: { type: string, description: "normalized (K; kJ/mol-atom or 'kJ/mol (basis unstated)')" }
+        value_stored: { type: [number, "null"] }
+        unit_stored: { type: string }
+        value_printed: {}
+        unit_printed: { type: string }
+        value_range: { type: object, properties: { min: { type: number }, max: { type: number } } }
+        value_expression: { type: string }
+        uncertainty:
+          type: object
+          properties:
+            value: { type: number }
+            basis: { type: string, description: "printed | stated_default | reading_resolution (placeholders are not measurements)" }
+            note: { type: string }
+        temperature_K: { type: [number, "null"] }
+        temperature_printed: { type: string }
+        temperature_basis: { type: string }
+        temperature_bound: { type: string, enum: [upper, lower] }
+        temperature_uncertainty: { type: object }
+        pressure_Pa: { type: number }
+        pressure_basis: { type: string }
+        phases:
+          type: array
+          items:
+            type: object
+            properties:
+              label: { type: string }
+              model_phase: { type: string }
+              mapping_confidence: { type: string }
+              pearson_symbol: { type: string }
+              prototype: { type: string }
+        phase_compositions:
+          type: array
+          items:
+            type: object
+            properties:
+              phase: { type: string }
+              composition: { $ref: "#/components/schemas/Composition" }
+              basis: { type: string, enum: [mole_fraction, unresolved] }
+              composition_source: { type: string }
+        overall_composition: { $ref: "#/components/schemas/Composition" }
+        overall_composition_basis: { type: string }
+        reference_state: { type: object }
+        reaction:
+          type: object
+          properties:
+            printed: { type: string }
+            type: { type: string }
+        evidence_class: { $ref: "#/components/schemas/EvidenceClass" }
+        origin:
+          type: object
+          properties:
+            class: { type: string }
+            basis: { type: string }
+            measured_in: { type: string }
+            measured_in_basis: { type: string }
+            own_work_of_paper: { type: boolean }
+            attribution_note: { type: string }
+        model:
+          description: Key of SystemFile.models (compact files) or the expanded ModelLink (jsonl dump)
+          oneOf:
+            - { type: string }
+            - { $ref: "#/components/schemas/ModelLink" }
+        model_unlinked_reason: { type: string }
+        method: { type: string }
+        method_basis: { type: string }
+        conditions:
+          type: object
+          properties:
+            kind: { type: string, enum: [paper_context, paper_context_not_extracted, cited_source, not_applicable_own_calculation] }
+            paper: { type: string }
+        cited_sources:
+          type: array
+          items:
+            type: object
+            properties:
+              label: { type: string }
+              reference: { type: string }
+              doi: { type: string }
+              first_author: { type: string }
+              year: { type: [integer, string, "null"] }
+              kind: { type: string }
+              status: { type: string }
+              paper: { type: string }
+        citations_printed: { type: array, items: { type: string } }
+        paper: { type: string, description: "id in papers.json (doi:..., sha256:...)" }
+        quote: { type: string, description: "running text: the one verbatim sentence (fair use)" }
+        quote_page: { type: integer }
+        locator:
+          type: object
+          description: "Compact files: {ref, row}; ref is a key of SystemFile.artifacts"
+          properties:
+            ref: { type: string }
+            row: {}
+        flags:
+          type: object
+          properties:
+            extraction_accepted: { type: boolean }
+            row_state: { type: string }
+            review_state: { type: string }
+            espei_ready: { type: boolean }
+            state_fully_specified: { type: boolean }
+            plausibility: { type: object }
+            source_disputed: { type: boolean }
+            magnitude_suspect: {}
+            unsigned_in_print: { type: boolean }
+            sign_pdf_page_verified: { type: boolean }
+            has_dropped_fields: { type: boolean }
+          additionalProperties: true
+        link_rule: { type: string }
+        readers: { type: array, items: { type: string } }
+        reader_tier: { type: string }
+        tool_release: { type: string }
+      additionalProperties: true
+
+    Artifact:
+      type: object
+      properties:
+        artifact: { type: string, enum: [table, text_passage] }
+        label: { type: string }
+        caption: { type: string }
+        page: { type: integer }
+        asset: { type: string }
+    ModelLink:
+      type: object
+      properties:
+        tdb: { type: string }
+        tdb_path: { type: string }
+        tdb_sha256: { type: string, pattern: "^[0-9a-f]{64}$" }
+        catalog_entry: { type: object }
+        link_basis: { type: string }
+        model_citation: { type: string }
+        model_doi: { type: [string, "null"] }
+        reproduced_by_calculation: { type: boolean }
+    Paper:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        doi: { type: [string, "null"] }
+        doi_url: { type: [string, "null"] }
+        citation: { type: string }
+        title: { type: [string, "null"] }
+        authors: { type: array, items: { type: string } }
+        year: { type: [integer, "null"] }
+        container: { type: [string, "null"] }
+        kind: { type: string, enum: [corpus_paper, cited_work] }
+        roles: { type: array, items: { type: string } }
+        systems: { type: array, items: { type: string } }
+        metadata_source: { type: string }
+        pdf_sha256_prefix: { type: string, description: "identifier only; the PDF is not distributed" }
+    Context:
+      type: object
+      properties:
+        paper: { type: string }
+        context_id: { type: string }
+        section_basis: { type: string }
+        reader_tier: { type: string }
+        readers: { type: array, items: { type: string } }
+        items:
+          type: array
+          items:
+            type: object
+            required: [type, quote, page]
+            properties:
+              id: { type: string }
+              type: { type: string, enum: [sample, treatment, measurement] }
+              quote: { type: string }
+              page: { type: integer }
+              extraction_accepted: { type: boolean }
+              second_reader_agrees: { type: boolean }
+            additionalProperties: true
+    DftParity:
+      type: object
+      properties:
+        description: { type: string }
+        band_kJ_per_mol_atom: { type: number }
+        kJ_per_mol_per_eV: { type: number }
+        counts: { type: object }
+        dft_sources: { type: object }
+        inputs: { type: object }
+        rules: { type: object }
+        papers: { type: object }
+        records:
+          type: object
+          description: "rid → literature fields (lit kJ/mol-atom, ev evidence class, formula, comp, paper, page, quote, ...)"
+          additionalProperties: { type: object }
+        points:
+          type: array
+          description: one per record × DFT source
+          items:
+            type: object
+            properties:
+              rid: { type: string }
+              src: { type: string, enum: [mp, oqmd] }
+              dft: { type: number, description: kJ/mol-atom }
+              dft_eV: { type: number }
+              res: { type: number, description: DFT - literature }
+              mid: { type: string }
+              sg: { type: string }
+              ehull: { type: number }
+              npoly: { type: integer }
+              theoretical: { type: boolean }
+
+    PhaseDiagramIndex:
+      type: object
+      properties:
+        source: { type: string }
+        engine: { type: string }
+        systems:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              properties:
+                file: { type: string }
+                tdb: { type: string }
+                sha256: { type: string }
+                grid: { type: boolean }
+                citation: { type: string }
+                doi: { type: [string, "null"] }
+    PhaseDiagram:
+      type: object
+      properties:
+        tdb: { type: string }
+        sha256: { type: string, description: SHA-256 of the TDB file used }
+        elements: { type: array, items: { type: string } }
+        components: { type: array, items: { type: string } }
+        x_component: { type: string, description: element whose mole fraction is the x axis }
+        T_range: { type: array, items: { type: number } }
+        phases: { type: array, items: { type: string } }
+        regions:
+          type: array
+          description: phase-boundary (ZPF) polylines; each region is a list of boundary segments
+          items:
+            type: array
+            items:
+              type: object
+              properties:
+                phase: { type: string }
+                x: { type: array, items: { type: number } }
+                T: { type: array, items: { type: number } }
+        invariants:
+          type: array
+          items:
+            type: object
+            properties:
+              T: { type: number }
+              points:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    phase: { type: string }
+                    x: { type: number }
+        grid:
+          type: object
+          description: "Stable phase set on a regular (x, T) grid. rows[i] is run-length encoded [[label_index, count], ...] at T = T0 + i*dT across x = 0..1 in steps of x_step."
+          properties:
+            x_step: { type: number }
+            x_points: { type: integer }
+            T0: { type: number }
+            dT: { type: number }
+            labels: { type: array, items: { type: string } }
+            rows: { type: array, items: { type: array, items: { type: array, items: { type: integer } } } }
+            note: { type: string }
+        engine: { type: string }
+        status: { type: string }
+        seconds: { type: number }
+        original_source:
+          type: object
+          properties:
+            citation: { type: string }
+            doi: { type: [string, "null"] }
+            url: { type: [string, "null"] }
+
+    HullDocument:
+      type: object
+      description: Binary hull as ordered composition intervals (BINARY_HULLS.md, schema_version 1).
+      required: [schema_version, system_id, elements, x_element, reference, isotherms]
+      properties:
+        schema_version: { type: integer }
+        system_id: { type: string }
+        elements: { type: array, items: { type: string } }
+        x_element: { type: string }
+        flags: { type: array, items: { type: string } }
+        counts: { type: object }
+        reference:
+          type: object
+          properties:
+            kind: { type: string, enum: [dft_elemental_ground_state_0K, dft_fitted_elemental_reference_0K, calphad_formation_T] }
+            per: { type: string }
+            temperature_K: { type: number }
+            units: { type: string }
+        provenance: { type: object }
+        mp_agreement: { type: object }
+        isotherms:
+          type: array
+          items:
+            type: object
+            properties:
+              temperature_K: { type: number }
+              vertices:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    phase: { type: string }
+                    formula: { type: string }
+                    x: { type: number }
+                    energy: { type: number, description: formation energy in reference units }
+                    spacegroup_symbol: { type: string }
+                    theoretical: { type: boolean }
+                    collinear: { type: boolean }
+                    degenerate: { type: array }
+              intervals:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    kind: { type: string, enum: [two_phase, single_phase] }
+                    x_lo: { type: number }
+                    x_hi: { type: number }
+                    slope: { type: number }
+                    intercept: { type: number }
+                    mu_a_rel: { type: number }
+                    mu_b_rel: { type: number }
+                    left: { type: object }
+                    right: { type: object }
+    HullEntries:
+      type: object
+      properties:
+        schema_version: { type: integer }
+        system_id: { type: string }
+        references: { type: object }
+        above_hull_omitted_beyond_window: {}
+        above_hull:
+          type: array
+          items:
+            type: object
+            properties:
+              phase: { type: string }
+              formula: { type: string }
+              x: { type: number }
+              energy: { type: number }
+              energy_above_hull_recomputed: { type: number }
+              spacegroup_symbol: { type: string }
+              theoretical: { type: boolean }
+
+    CatalogEntry:
+      type: object
+      required: [name, elements, tier, license, license_status]
+      properties:
+        name: { type: string }
+        category: { type: string }
+        elements: { type: string, example: AL-NI }
+        n_elements: { type: integer }
+        n_phases: { type: [integer, "null"] }
+        archived: { type: string, enum: ["Yes", "No"] }
+        tier: { type: string, enum: [bundled, fetched, manual] }
+        local_path: { type: string, description: "bundled only: path under https://orchid-project.org/data/" }
+        source_repo: { type: string }
+        source_url: { type: string }
+        download_url: { type: string }
+        license: { type: string }
+        license_status: { type: string, enum: [confirmed, uncertain, restricted, conflicting] }
+        format_compat: { type: string }
+        size_lines: { type: [integer, "null"] }
+        notes: { type: string }

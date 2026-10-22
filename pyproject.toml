@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orchid-mcp"
+version = "0.1.0"
+description = "MCP server and static JSON API description for ORCHID CALPHAD data (literature values, phase diagrams, DFT hulls, TDB catalog) with full provenance"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Raymundo Arróyave" }]
+keywords = ["CALPHAD", "MCP", "thermodynamics", "phase diagrams", "TDB"]
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.10"]
+test = ["pytest", "pyyaml"]
+
+[project.scripts]
+orchid-mcp = "orchid_mcp.server:main"
+
+[project.urls]
+Homepage = "https://orchid-project.org"
+Data = "https://data.orchid-project.org"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
