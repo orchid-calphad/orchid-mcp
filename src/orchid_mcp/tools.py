@@ -1239,7 +1239,8 @@ class Orchid:
             "evidence_summary": ev, "availability": r.get("availability"),
             "is_referenced_by_count": r.get("is_referenced_by_count"),
             "is_referenced_by_count_retrieved": r.get("is_referenced_by_count_retrieved"),
-            "doi_check": r.get("doi_check"), "relation_counts": r.get("relation_counts"), "urls": r.get("urls"),
+            "doi_match": r.get("doi_match"), "doi_check": r.get("doi_check"), "relation_counts": r.get("relation_counts"),
+            "urls": r.get("urls"),
         }
 
     def _bib_view(self, doc: dict[str, Any], fields: str) -> dict[str, Any]:

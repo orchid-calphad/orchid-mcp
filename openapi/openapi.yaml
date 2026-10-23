@@ -411,8 +411,8 @@ paths:
       description: |
         `{file}` is `{key}.json` with `key = "p" + sha256(id)[:16]` (id `doi:<lowercase DOI>` or `nodoi:<hash>`).
         `{paper, relations[], cite_as, licence}`; `paper` carries Crossref metadata, `roles`, `role_details`,
-        `evidence_summary`, `availability`, `doi_check`; each relation `{direction, type, edge_id, other, count,
-        provenance, attrs}`.
+        `evidence_summary`, `availability`, `doi_match` (verified | weak | unverifiable for DOIs matched from a printed
+        reference), `doi_check`; each relation `{direction, type, edge_id, other, count, provenance, attrs}`.
       parameters:
         - name: file
           in: path
