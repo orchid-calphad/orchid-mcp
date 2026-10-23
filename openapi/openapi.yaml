@@ -39,6 +39,8 @@ tags:
     description: Binary convex hulls (Materials Project, OQMD, CALPHAD isotherms).
   - name: phases
     description: Phase registry (binary systems) — every name of a phase, its TDB models, stability and structure type.
+  - name: bibliography
+    description: Every paper ORCHID knows about — Crossref metadata, roles, evidence counts and typed relations.
   - name: catalog
     description: TDB catalog and bundled TDB files (served from orchid-project.org/data).
   - name: release
@@ -389,6 +391,136 @@ paths:
           description: JSON-LD
           content:
             application/ld+json: { schema: { type: object } }
+  /bibliography/index.json:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographyIndex
+      summary: Release info, counts, id rule, URL templates and a compact search table of every paper
+      description: |
+        `{dataset, version, counts, inputs, id_rule, urls, columns[], rows[][], cite_as}`; each row is
+        `[key, id, doi, title, year, container, roles[], systems[], properties[], evidence_classes[],
+        values_reported, values_cited, authors[]]`. Look up a paper's `key` by DOI here, then fetch
+        `/bibliography/papers/{key}.json`. Field reference: `/bibliography/SCHEMA.md`.
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+  /bibliography/papers/{file}:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographyPaper
+      summary: One paper of the bibliography with its relations
+      description: |
+        `{file}` is `{key}.json` with `key = "p" + sha256(id)[:16]` (id `doi:<lowercase DOI>` or `nodoi:<hash>`).
+        `{paper, relations[], cite_as, licence}`; `paper` carries Crossref metadata, `roles`, `role_details`,
+        `evidence_summary`, `availability`, `doi_check`; each relation `{direction, type, edge_id, other, count,
+        provenance, attrs}`.
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema: { type: string, pattern: "^p[0-9a-f]{16}\\.json$" }
+          example: pd5e729a388c2c588.json
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /bibliography/systems/{file}:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographySystem
+      summary: Papers of one chemical system by role, and its assessments with the data papers they used
+      description: |
+        `{file}` is `{system}.json` (sorted element symbols joined by `-`, any order of components).
+        `{system, elements, papers_by_role{}, papers[], assessments[{id, key, doi, title, year, tdb_files[],
+        data_papers_used[], n_data_papers_used, n_values_from_cited_papers, reassesses[]}], cite_as}`.
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[A-Z][A-Z]?(-[A-Z][A-Z]?)*\\.json$" }
+          example: AL-NI.json
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /bibliography/systems_index.json:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographySystemsIndex
+      summary: System -> role -> paper ids
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+  /bibliography/SCHEMA.md:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographySchema
+      summary: Field reference of the bibliography (Croissant-ready column descriptions)
+      responses:
+        "200": { $ref: "#/components/responses/Markdown" }
+  /bibliography/papers.parquet:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographyPapersParquet
+      summary: One flat row per paper (stable `id`)
+      responses:
+        "200":
+          description: Parquet
+          content:
+            application/vnd.apache.parquet: { schema: { type: string, format: binary } }
+  /bibliography/edges.parquet:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographyEdgesParquet
+      summary: One row per typed relation (stable `id`), with provenance
+      responses:
+        "200":
+          description: Parquet
+          content:
+            application/vnd.apache.parquet: { schema: { type: string, format: binary } }
+  /bibliography/papers.jsonl:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographyPapersJsonl
+      summary: Every paper record, one JSON object per line
+      responses:
+        "200":
+          description: JSON Lines
+          content:
+            application/jsonl: { schema: { type: string } }
+  /bibliography/edges.jsonl:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographyEdgesJsonl
+      summary: Every relation, one JSON object per line
+      responses:
+        "200":
+          description: JSON Lines
+          content:
+            application/jsonl: { schema: { type: string } }
+  /bibliography/papers.jsonld:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographyJsonLd
+      summary: The papers as schema.org ScholarlyArticle nodes (JSON-LD)
+      responses:
+        "200":
+          description: JSON-LD
+          content:
+            application/ld+json: { schema: { type: object } }
+  /bibliography/orchid-bibliography.bib:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographyBibtex
+      summary: BibTeX generated from Crossref metadata
+      responses:
+        "200":
+          description: BibTeX
+          content:
+            application/x-bibtex: { schema: { type: string } }
+  /bibliography/orchid-bibliography.csl.json:
+    get:
+      tags: [bibliography]
+      operationId: getBibliographyCslJson
+      summary: CSL-JSON generated from Crossref metadata
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
   /catalog.json:
     servers:
       - url: https://orchid-project.org/data

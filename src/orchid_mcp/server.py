@@ -25,8 +25,9 @@ SERVER_NAME = "orchid"
 INSTRUCTIONS = (
     "ORCHID: CALPHAD thermodynamic data with provenance. Literature values (experimental | model | dft | "
     "unspecified, never mixed), calculated binary phase diagrams tied to TDB files by SHA-256, Materials Project "
-    "and OQMD formation energies, the TDB catalog, and the phase registry (every name of each binary "
-    "phase, its TDB models, stability and crystal structure when certain). Every value carries its citation, DOI, page and quote; "
+    "and OQMD formation energies, the TDB catalog, the phase registry (every name of each binary "
+    "phase, its TDB models, stability and crystal structure when certain), and the bibliography (every paper ORCHID knows, "
+    "its roles, evidence and typed relations: cites, used_in_assessment, reassesses, ...). Every value carries its citation, DOI, page and quote; "
     "report them, and cite ORCHID plus the original sources (see the cite_orchid prompt)."
 )
 
@@ -170,10 +171,59 @@ def get_tdb(file: str, include_content: bool = True) -> dict:
     return _call(orchid().get_tdb, file=file, include_content=include_content)
 
 
-def get_paper(doi: str) -> dict:
-    """Bibliographic record of a paper by DOI (or ORCHID paper id): systems, number of values it reports,
-    and its experimental-context items (samples, treatments, measurements) with quotes and pages."""
-    return _call(orchid().get_paper, doi=doi)
+def get_paper(doi: str, fields: Fields = "summary") -> dict:
+    """Bibliographic record of a paper by DOI (or ORCHID id: "doi:...", "nodoi:...", literature "ref:..." ids, or a
+    bibliography key "p..."): systems, number of values it reports, its experimental-context items (quotes, pages),
+    and its ORCHID bibliography entry: roles (corpus_assessment_read, cited_original_source, tdb_source_assessment,
+    handbook_diagram_source, discovery_lead, ...), evidence summary (values by evidence class / property group,
+    tables, passages, ESPEI datasets, phase-registry phases), Crossref metadata, open-access licence from Crossref,
+    relation counts. fields="full" adds the complete bibliography record and every relation (edges with provenance)."""
+    return _call(orchid().get_paper, doi=doi, fields=fields)
+
+
+def search_papers(
+    system: str | None = None,
+    elements: list[str] | None = None,
+    role: str | None = None,
+    property: str | None = None,
+    evidence_class: str | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    text: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    """Search the ORCHID bibliography (every paper ORCHID knows about). system: exact chemical system ("Al-Ni");
+    elements: papers with a system containing all of them. role: corpus_assessment_read | cited_original_source |
+    tdb_source_assessment | tdb_compilation | handbook_diagram_source | discovery_lead | context_source |
+    espei_reference. property: property code of values reported in / citing the paper (HM_FORM,
+    INVARIANT_TEMPERATURE, ...). evidence_class: experimental | model | dft | unspecified. year_from / year_to;
+    text: substring of title, authors or DOI. Sorted by year, then id; paginate with offset (`total` counts all)."""
+    return _call(
+        orchid().search_papers, system=system, elements=elements, role=role, property=property,
+        evidence_class=evidence_class, year_from=year_from, year_to=year_to, text=text, limit=limit, offset=offset,
+    )
+
+
+def get_paper_relations(
+    doi: str, relation: str | None = None, direction: str = "both", limit: int = 100, offset: int = 0
+) -> dict:
+    """Typed relations of one paper (DOI or bibliography id), each with provenance. relation: cites (paper -> works
+    printed as the source of its values; count = values) | used_in_assessment (data paper -> assessments that used
+    it) | models_system_in_tdb (paper -> TDB file) | reassesses (later -> earlier assessment of the same exact
+    system that it cites) | handbook_reproduces (handbook diagram -> original evaluation) | cited_by_crossref
+    (publisher-deposited Crossref reference lists). direction: out | in | both. Examples: which original papers did
+    this assessment use -> relation="cites", direction="out"; which assessments used this paper ->
+    relation="used_in_assessment", direction="out"; reassessment chain -> relation="reassesses"."""
+    return _call(orchid().get_paper_relations, doi=doi, relation=relation, direction=direction, limit=limit, offset=offset)
+
+
+def get_assessment_evidence(system: str, max_data_papers: int = 25) -> dict:
+    """Assessments of an exact chemical system (papers behind its TDB files or read by ORCHID) with the original
+    data papers each used (works printed as the source of the extracted values, with value counts and evidence
+    classes), the TDB files, reassessment links (citation+same-system) and paper counts by role. max_data_papers
+    caps the data-paper list per assessment (flag data_papers_truncated)."""
+    return _call(orchid().get_assessment_evidence, system=system, max_data_papers=max_data_papers)
 
 
 def compare_to_dft(system: str, default_subset_only: bool = False, fields: Fields = "summary") -> dict:
@@ -228,6 +278,9 @@ TOOLS: list[Callable[..., dict]] = [
     list_tdb_files,
     get_tdb,
     get_paper,
+    search_papers,
+    get_paper_relations,
+    get_assessment_evidence,
     compare_to_dft,
     get_phase,
     search_phases,
@@ -238,6 +291,7 @@ RESOURCES = {
     "orchid://schema": ("schema", "ORCHID literature data schema (SCHEMA.md)", "text/markdown"),
     "orchid://dataset-card": ("dataset-card", "ORCHID dataset card (README + CITATION.cff)", "text/markdown"),
     "orchid://licence": ("licence", "ORCHID data licences and attributions (LICENSES.md, NOTICE.md)", "text/markdown"),
+    "orchid://bibliography-schema": ("bibliography-schema", "ORCHID bibliography schema (bibliography/SCHEMA.md)", "text/markdown"),
 }
 
 

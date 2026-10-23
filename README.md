@@ -88,7 +88,10 @@ Omit `env` to use the online data.
 | `get_formation_enthalpy(formula, fields)` | literature HM_FORM (kJ/mol-atom) + Materials Project and OQMD entries at that composition + per-class summaries |
 | `get_phase_diagram(system, assessment, x, T, fields)` | TDB file, SHA-256, assessment citation/DOI, phases, invariants, viewer URL (`full`: region summary, grid); stable phases at (x, T) from the stored grid |
 | `list_tdb_files(elements, exact, tier, limit=50, offset, fields)` / `get_tdb(file)` | licence, tier, SHA-256, download URL (`full`: whole catalog entry); file content **only** for bundled, confirmed-licence files |
-| `get_paper(doi)` | bibliographic record, systems, number of values, experimental-context items with quotes |
+| `get_paper(doi, fields)` | bibliographic record, systems, number of values, experimental-context items with quotes, and the bibliography entry: roles, evidence summary, Crossref metadata, open-access licence (Crossref `license` only), relation counts (`full`: whole record and every relation with provenance). Accepts a DOI, `doi:`/`nodoi:` id, literature id or bibliography key |
+| `search_papers(system, elements, role, property, evidence_class, year_from, year_to, text, limit=50, offset)` | papers of the bibliography (every paper ORCHID knows) by exact system, elements, role (`corpus_assessment_read`, `cited_original_source`, `tdb_source_assessment`, `handbook_diagram_source`, `discovery_lead`, ...), property code, evidence class, years, title/author text |
+| `get_paper_relations(doi, relation, direction="both", limit=100, offset)` | typed edges with provenance: `cites`, `used_in_assessment`, `models_system_in_tdb`, `reassesses` (citation+same-system), `handbook_reproduces`, `cited_by_crossref` — e.g. which original papers an assessment used, which assessments used a paper, a system's reassessment chain |
+| `get_assessment_evidence(system, max_data_papers=25)` | assessments of an exact system with the data papers each used (value counts, evidence classes), TDB files and reassessment links |
 | `compare_to_dft(system, fields)` | literature vs MP vs OQMD formation enthalpies with residuals and the DFT hull vertices |
 | `get_phase(system, phase, fields)` | one phase of the phase registry by id, namespaced name (`tdb:`, `paper:`, `corpus:`, `mp:`, `oqmd:`) or label (`L12_FCC`, `NI3TI`): structure (tier A/B/C), names, TDB models with verbatim PHASE/CONSTITUENT lines, stability, first 5 reference DOIs (`full`: `tdb_definition`, all references, candidates) |
 | `search_phases(elements, name, prototype, tier, status, limit=50, offset)` | phases filtered by elements, name/label, prototype / Strukturbericht / Pearson (`L1_2` = `L12`), tier (A, B, C, liquid, gas, none) |
@@ -115,7 +118,7 @@ CU-ZR, bytes of JSON per call (0.1.0 defaults → current defaults):
 | `search_systems(["Cu"])` | 47,947 | 12,135 |
 | `list_tdb_files(["Cu","Zr"])` | 20,874 | 10,294 |
 
-Resources: `orchid://schema` (SCHEMA.md), `orchid://dataset-card` (README + CITATION.cff), `orchid://licence`
+Resources: `orchid://schema` (SCHEMA.md), `orchid://bibliography-schema` (bibliography/SCHEMA.md), `orchid://dataset-card` (README + CITATION.cff), `orchid://licence`
 (LICENSES.md + NOTICE.md). Prompt: `cite_orchid` (how to cite ORCHID and the original sources).
 
 Rules the tools keep: evidence classes (experimental, model, dft, unspecified) are never mixed or averaged; MP and

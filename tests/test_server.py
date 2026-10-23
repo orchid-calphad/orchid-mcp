@@ -10,6 +10,7 @@ EXPECTED = {
     "search_systems", "get_system_data", "get_invariant_reactions", "get_formation_enthalpy",
     "get_phase_diagram", "list_tdb_files", "get_tdb", "get_paper", "compare_to_dft",
     "get_phase", "search_phases", "get_structure_type",
+    "search_papers", "get_paper_relations", "get_assessment_evidence",
 }
 
 
@@ -23,6 +24,10 @@ def test_tool_schemas():
     assert tools["get_system_data"]["inputSchema"]["properties"]["limit"]["default"] == 50
     assert tools["get_phase"]["inputSchema"]["required"] == ["system", "phase"]
     assert tools["search_phases"]["inputSchema"]["properties"]["limit"]["default"] == 50
+    assert tools["search_papers"]["inputSchema"]["required"] == []
+    assert tools["get_paper_relations"]["inputSchema"]["properties"]["direction"]["default"] == "both"
+    assert tools["get_assessment_evidence"]["inputSchema"]["required"] == ["system"]
+    assert tools["get_paper"]["inputSchema"]["properties"]["fields"]["default"] == "summary"
 
 
 def _rpc(proc, mid, method, params=None):
@@ -50,7 +55,8 @@ def test_stdio_smoke(server_env, fallback, orchid):
         bad = _rpc(proc, 4, "tools/call", {"name": "get_paper", "arguments": {"doi": "10.0000/none"}})
         assert bad["result"]["isError"] is True
         res = _rpc(proc, 5, "resources/list")["result"]["resources"]
-        assert {r["uri"] for r in res} == {"orchid://schema", "orchid://dataset-card", "orchid://licence"}
+        assert {r["uri"] for r in res} == {"orchid://schema", "orchid://dataset-card", "orchid://licence",
+                                         "orchid://bibliography-schema"}
         schema = _rpc(proc, 6, "resources/read", {"uri": "orchid://schema"})["result"]["contents"][0]["text"]
         assert "Record fields" in schema
         prompts = _rpc(proc, 7, "prompts/list")["result"]["prompts"]
