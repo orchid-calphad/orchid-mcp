@@ -26,6 +26,7 @@ def test_get_phase_by_id_name_and_label(fx):
     assert "tdb_definition" not in json.dumps(p)
     assert len(p["references"]) <= 5 and all("doi" in x for x in p["references"])
     assert p["viewer_url"].endswith("/phases/#phase:al-ni:fcc-l12") and p["data_url"].endswith("phases/systems/AL-NI.json")
+    assert p["static_page_url"].endswith("phases/pages/AL-NI.html#phase-al-ni-fcc-l12")
     assert "Hallstedt" in r["how_to_cite_phase_registry"] and r["orchid"]["release"]
     assert fx.get_phase("Ni-Al", "l12_fcc")["phase"]["id"] == "phase:al-ni:fcc-l12"
     assert fx.get_phase("AL-NI", "tdb:AlNi-01Dup-LB.tdb:L12_FCC")["phase"]["id"] == "phase:al-ni:fcc-l12"

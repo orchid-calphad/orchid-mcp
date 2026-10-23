@@ -1161,6 +1161,8 @@ class Orchid:
         return {
             "viewer_url": f"{SITE_URL}phases/#{pid}",
             "data_url": f"{PUBLIC_DATA_URL}phases/systems/{sid}.json",
+            "static_page_url": f"{PUBLIC_DATA_URL}phases/pages/{sid}.html#"
+            + re.sub(r"[^a-z0-9]+", "-", pid.lower()).strip("-"),
         }
 
     def _phase_row_summary(self, r: dict[str, Any]) -> dict[str, Any]:
