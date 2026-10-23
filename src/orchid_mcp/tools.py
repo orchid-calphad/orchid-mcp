@@ -109,6 +109,36 @@ CITE_TEXT = (
 )
 
 
+# ---------------------------------------------------------------- phase registry
+PHASE_NAMES_MAX = 30
+PHASE_MODELS_MAX = 50
+PHASE_REFS_SUMMARY = 5
+PHASE_EXAMPLES = 5
+TDB_STATEMENT_MAX = 4000
+PHASE_STRUCTURE_KEYS = ("structure_type", "basis", "tier", "confidence", "prototype", "strukturbericht", "pearson", "space_group")
+PHASE_TIERS = {
+    "A": "standard_name: the TDB phase name encodes one structure; model stoichiometry/sublattices and DFT agree",
+    "B": "dft_unique_match ('DFT-supported'): one on-hull entry in both Materials Project and OQMD, same space group",
+    "C": "assessment_declared ('assessor-stated'): one structure in the Hallstedt 2025 crystallographic table (mmc2)",
+    "liquid": "liquid (no prototype)",
+    "gas": "gas (no prototype)",
+    "none": "no structure assigned (needs_review with candidates, or unresolved)",
+}
+PHASE_CITE_TEXT = (
+    "Cite the ORCHID phase registry (binary systems) of the release you used (phases/CITATION.cff; Zenodo record "
+    "phase-registry), the original CALPHAD assessment of every TDB model you use (references with role 'assessment "
+    "that models this phase'), B. Hallstedt, Calphad 89 (2025) 102833, doi:10.1016/j.calphad.2025.102833 for the "
+    "SGTE TDB files and tier-C structures, and Materials Project / OQMD for tier-B (DFT-supported) structures."
+)
+
+
+def _struct_norm(x: Any) -> str:
+    """Case- and separator-insensitive key for structure labels (L1_2 == L12, D0_19 == D019, 'Pm-3m' == 'pm3m')."""
+    if x is None:
+        return ""
+    return re.sub(r"[\s_\-()'′,.]", "", str(x)).lower()
+
+
 class OrchidError(ValueError):
     """A tool-level error with a message meant for the caller."""
 
@@ -1106,6 +1136,278 @@ class Orchid:
                 "experimental_context": ctx,
                 "n_context_items": len((ctx or {}).get("items", [])),
                 "note": "Bibliographic record only; ORCHID does not redistribute the paper. Context items carry their quote and page.",
+            }
+        )
+
+    # ---------------------------------------------------------- phase registry
+    def _phase_index(self) -> dict[str, Any]:
+        try:
+            return self.data.read_json("phases/registry.json")
+        except NotFound as exc:
+            raise OrchidError("the phase registry (phases/registry.json) is not in this ORCHID data source") from exc
+
+    def _phase_system(self, sid: str) -> dict[str, Any]:
+        try:
+            return self.data.read_json(f"phases/systems/{sid}.json")
+        except NotFound as exc:
+            raise OrchidError(f"no phase-registry file for {sid} (binary systems only)") from exc
+
+    def _phase_rows(self, sid: str | None = None) -> list[dict[str, Any]]:
+        rows = self._phase_index().get("phases", [])
+        return [r for r in rows if r.get("system") == sid] if sid else rows
+
+    @staticmethod
+    def _phase_links(pid: str, sid: str) -> dict[str, str]:
+        return {
+            "viewer_url": f"{SITE_URL}phases/#{pid}",
+            "data_url": f"{PUBLIC_DATA_URL}phases/systems/{sid}.json",
+        }
+
+    def _phase_row_summary(self, r: dict[str, Any]) -> dict[str, Any]:
+        names = r.get("names") or []
+        return {
+            "id": r.get("id"),
+            "system": r.get("system"),
+            "preferred_name": r.get("preferred_name"),
+            "status": r.get("status"),
+            "structure": r.get("structure"),
+            "tdb_names": r.get("tdb_names") or [],
+            "stoichiometry": r.get("stoichiometry"),
+            "n_names": len(names),
+            "counts": r.get("counts") or {},
+            "viewer_url": f"{SITE_URL}phases/#{r.get('id')}",
+        }
+
+    @staticmethod
+    def _labels_of(r: dict[str, Any]) -> set[str]:
+        out = {str(r.get("preferred_name") or "").lower()}
+        out |= {str(n).lower() for n in r.get("tdb_names") or []}
+        for n in r.get("names") or []:
+            out.add(str(n).lower())
+            out.add(str(n).rsplit(":", 1)[-1].lower())
+        out.add(str(r.get("id") or "").rsplit(":", 1)[-1].lower())
+        out.discard("")
+        return out
+
+    def _phase_summary(self, e: dict[str, Any]) -> dict[str, Any]:
+        by_ns: dict[str, list[str]] = {}
+        for n in e.get("names") or []:
+            by_ns.setdefault(n.get("namespace") or "?", []).append(n.get("name"))
+        names = {
+            ns: {"n": len(v), "names": v[:PHASE_NAMES_MAX], **({"truncated": True} if len(v) > PHASE_NAMES_MAX else {})}
+            for ns, v in sorted(by_ns.items())
+        }
+        stab = [
+            {k: s.get(k) for k in ("tdb", "stable", "T_min_K", "T_max_K", "x_element", "x_min", "x_max") if k in s}
+            for s in e.get("stability") or []
+            if s.get("status") == "ok"
+        ]
+        models = []
+        for m in (e.get("models") or [])[:PHASE_MODELS_MAX]:
+            v = ((m.get("tdb_definition") or {}).get("verbatim") or {})
+            models.append(
+                {
+                    "tdb": m.get("tdb"),
+                    "phase_name": m.get("phase_name"),
+                    "type_code": m.get("type_code"),
+                    "sublattices": " : ".join(
+                        f"{sl.get('site_ratio')} ({','.join(sl.get('constituents') or [])})" for sl in m.get("sublattices") or []
+                    ),
+                    "phase_statement": _short((v.get("phase") or {}).get("text")),
+                    "constituent_statement": _short((v.get("constituent") or {}).get("text")),
+                    "website_url": ((m.get("tdb_definition") or {}).get("provenance") or {}).get("website_url"),
+                }
+            )
+        refs = e.get("references") or []
+        out = {
+            "id": e.get("id"),
+            "system": e.get("system"),
+            "preferred_name": e.get("preferred_name"),
+            "status": e.get("status"),
+            "structure": {k: (e.get("structure") or {}).get(k) for k in PHASE_STRUCTURE_KEYS} if e.get("structure") else None,
+            "review_reasons": e.get("review_reasons") or [],
+            "n_candidates": len(e.get("candidates") or []),
+            "stoichiometry": e.get("stoichiometry"),
+            "names": names,
+            "models": models,
+            "n_models": len(e.get("models") or []),
+            "stability": stab,
+            "literature": e.get("literature"),
+            "references": [{"doi": r.get("doi"), "roles": r.get("roles")} for r in refs[:PHASE_REFS_SUMMARY]],
+            "total_papers": e.get("total_papers"),
+            **self._phase_links(e["id"], e["system"]),
+        }
+        if len(e.get("models") or []) > PHASE_MODELS_MAX:
+            out["models_truncated"] = True
+        return out
+
+    def _phase_full(self, e: dict[str, Any]) -> dict[str, Any]:
+        out = dict(e)
+        models = []
+        for m in (e.get("models") or [])[:PHASE_MODELS_MAX]:
+            m = dict(m)
+            td = m.get("tdb_definition")
+            if td:
+                td = dict(td)
+                vb = dict(td.get("verbatim") or {})
+                for key in ("phase", "constituent"):
+                    if isinstance(vb.get(key), dict) and len(vb[key].get("text") or "") > TDB_STATEMENT_MAX:
+                        vb[key] = {**vb[key], "text": _short(vb[key]["text"], TDB_STATEMENT_MAX), "text_truncated": True}
+                vb["type_definitions"] = [
+                    {**t, "text": _short(t.get("text"), TDB_STATEMENT_MAX)} for t in vb.get("type_definitions") or []
+                ]
+                td["verbatim"] = vb
+                m["tdb_definition"] = td
+            models.append(m)
+        out["models"] = models
+        if len(e.get("models") or []) > PHASE_MODELS_MAX:
+            out["models_truncated"] = f"first {PHASE_MODELS_MAX} of {len(e['models'])}; see data_url"
+        out.update(self._phase_links(e["id"], e["system"]))
+        return out
+
+    def get_phase(self, system: str, phase: str, fields: str = "summary") -> dict[str, Any]:
+        """One phase of a binary system from the ORCHID phase registry (by id, namespaced name or plain label)."""
+        fields = _check_fields(fields)
+        q = (phase or "").strip()
+        if not q:
+            raise OrchidError("phase is empty: give a registry id, a namespaced name or a label such as 'L12_FCC'")
+        if q.lower().startswith("phase:") and (not system or str(system).lower().startswith("phase:")):
+            parts = q.split(":")
+            system = parts[1].upper() if len(parts) > 2 else system
+        sid = self._sys(system)
+        rows = self._phase_rows(sid)
+        if not rows:
+            raise OrchidError(f"no phases for {sid} in the phase registry (binary systems only; use search_phases)")
+        ql = q.lower()
+        hits = [r for r in rows if str(r.get("id")).lower() == ql]
+        if not hits:
+            hits = [r for r in rows if ql in {str(n).lower() for n in r.get("names") or []}]
+        if not hits:
+            hits = [r for r in rows if ql in self._labels_of(r)]
+        if not hits:
+            hits = [r for r in rows if any(ql in lab for lab in self._labels_of(r))]
+        if not hits:
+            raise OrchidError(
+                f"no phase {phase!r} in {sid}; phases: " + ", ".join(sorted(str(r.get("preferred_name")) for r in rows))
+            )
+        if len(hits) > 1:
+            return self._wrap(
+                {
+                    "query": {"system": sid, "phase": q},
+                    "ambiguous": True,
+                    "matches": [self._phase_row_summary(r) for r in hits],
+                    "hint": "call get_phase again with one of the ids",
+                    "how_to_cite_phase_registry": PHASE_CITE_TEXT,
+                }
+            )
+        row = hits[0]
+        doc = self._phase_system(sid)
+        e = next((x for x in doc.get("phases", []) if x.get("id") == row["id"]), None)
+        if e is None:
+            raise OrchidError(f"{row['id']} is in registry.json but not in phases/systems/{sid}.json")
+        return self._wrap(
+            {
+                "query": {"system": sid, "phase": q},
+                "fields": fields,
+                "phase": self._phase_summary(e) if fields == "summary" else self._phase_full(e),
+                "how_to_cite_phase_registry": PHASE_CITE_TEXT,
+            }
+        )
+
+    def search_phases(
+        self,
+        elements: list[str] | None = None,
+        name: str | None = None,
+        prototype: str | None = None,
+        tier: str | None = None,
+        status: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Phases of the registry filtered by elements, name, prototype / Strukturbericht / Pearson, tier, status."""
+        try:
+            want = {element(x) for x in elements or []}
+        except ChemError as exc:
+            raise OrchidError(str(exc)) from exc
+        t = (tier or "").strip()
+        tiers = {"a": "A", "b": "B", "c": "C", "liquid": "liquid", "gas": "gas", "none": "none"}
+        if t and t.lower() not in tiers:
+            raise OrchidError("tier must be one of A, B, C, liquid, gas, none")
+        t = tiers.get(t.lower()) if t else None
+        nq = (name or "").strip().lower()
+        pq = _struct_norm(prototype) if prototype else ""
+        rows = []
+        for r in self._phase_rows():
+            if want and not want <= set(r.get("elements") or str(r.get("system", "")).split("-")):
+                continue
+            s = r.get("structure") or {}
+            if t:
+                rt = "none" if not s else ("liquid" if s.get("basis") == "liquid" else "gas" if s.get("basis") == "gas" else s.get("tier"))
+                if rt != t:
+                    continue
+            if status and r.get("status") != status:
+                continue
+            if nq and not any(nq in lab for lab in self._labels_of(r)):
+                continue
+            if pq:
+                keys = {_struct_norm(s.get(k)) for k in ("prototype", "strukturbericht", "pearson", "structure_type")}
+                keys.add(_struct_norm(str(s.get("structure_type") or "").removeprefix("st:")))
+                if pq not in keys:
+                    continue
+            rows.append(r)
+        rows.sort(key=lambda r: (r.get("system") or "", r.get("id") or ""))
+        lim, off = max(1, min(int(limit), 500)), max(0, int(offset))
+        return self._wrap(
+            {
+                "query": {"elements": sorted(want), "name": name, "prototype": prototype, "tier": t, "status": status},
+                "total": len(rows),
+                "offset": off,
+                "returned": len(rows[off : off + lim]),
+                "truncated": off + lim < len(rows),
+                "phases": [self._phase_row_summary(r) for r in rows[off : off + lim]],
+                "tiers": PHASE_TIERS,
+                "how_to_cite_phase_registry": PHASE_CITE_TEXT,
+            }
+        )
+
+    def get_structure_type(self, query: str, limit: int = 20) -> dict[str, Any]:
+        """Structure types by id, prototype, Strukturbericht, Pearson symbol or space group (symbol or number)."""
+        q = (query or "").strip()
+        if not q:
+            raise OrchidError("query is empty: give a structure-type id, prototype, Strukturbericht or Pearson symbol")
+        try:
+            st = self.data.read_json("phases/structure_types.json").get("structure_types", [])
+        except NotFound as exc:
+            raise OrchidError("phases/structure_types.json is not in this ORCHID data source") from exc
+        qn = _struct_norm(q)
+        hits = []
+        for t in st:
+            sg = t.get("space_group") or {}
+            keys = {_struct_norm(t.get(k)) for k in ("id", "prototype", "strukturbericht", "pearson")}
+            keys.add(_struct_norm(str(t.get("id") or "").removeprefix("st:")))
+            keys |= {_struct_norm(x) for x in t.get("prototype_spellings") or []}
+            keys |= {_struct_norm(sg.get("symbol")), _struct_norm(str(sg.get("number") or ""))}
+            keys.discard("")
+            if qn in keys:
+                hits.append(t)
+        if not hits:
+            raise OrchidError(f"no structure type matches {query!r} (try a prototype like 'AuCu3', 'L1_2' or 'cP4')")
+        hits.sort(key=lambda t: (-(t.get("registry_phases") or 0), t.get("id") or ""))
+        ids = {t["id"] for t in hits[: max(1, limit)]}
+        examples: dict[str, list[str]] = {}
+        for r in self._phase_rows():
+            sid = (r.get("structure") or {}).get("structure_type")
+            if sid in ids and len(examples.setdefault(sid, [])) < PHASE_EXAMPLES:
+                examples[sid].append(r["id"])
+        return self._wrap(
+            {
+                "query": q,
+                "total": len(hits),
+                "truncated": len(hits) > max(1, limit),
+                "structure_types": [
+                    {**t, "example_phases": examples.get(t["id"], [])} for t in hits[: max(1, limit)]
+                ],
+                "how_to_cite_phase_registry": PHASE_CITE_TEXT,
             }
         )
 

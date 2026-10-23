@@ -9,6 +9,7 @@ from orchid_mcp import server
 EXPECTED = {
     "search_systems", "get_system_data", "get_invariant_reactions", "get_formation_enthalpy",
     "get_phase_diagram", "list_tdb_files", "get_tdb", "get_paper", "compare_to_dft",
+    "get_phase", "search_phases", "get_structure_type",
 }
 
 
@@ -20,6 +21,8 @@ def test_tool_schemas():
     fields = tools["get_system_data"]["inputSchema"]["properties"]["fields"]
     assert fields["enum"] == ["summary", "full"] and fields["default"] == "summary"
     assert tools["get_system_data"]["inputSchema"]["properties"]["limit"]["default"] == 50
+    assert tools["get_phase"]["inputSchema"]["required"] == ["system", "phase"]
+    assert tools["search_phases"]["inputSchema"]["properties"]["limit"]["default"] == 50
 
 
 def _rpc(proc, mid, method, params=None):
