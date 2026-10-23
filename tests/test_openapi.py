@@ -59,6 +59,11 @@ EXAMPLES = {
 }
 
 
+def _bib_example_file():
+    import hashlib
+    return "p" + hashlib.sha256(b"doi:10.1016/j.calphad.2005.02.002").hexdigest()[:16] + ".json"
+
+
 def test_documented_paths_exist_locally():
     spec = _load()
     if not DATA_DIR.is_dir() or not SITE_DIR.is_dir():
@@ -71,7 +76,8 @@ def test_documented_paths_exist_locally():
             if name == "file":
                 val = {"/literature/systems/{file}": "AL-NI.json", "/phase-diagrams/sgte/{file}": "AlNi-05Mie.json",
                        "/databases/{collection}/{file}": "AlNi-05Mie.tdb",
-                       "/phases/systems/{file}": "AL-NI.json"}[path]
+                       "/phases/systems/{file}": "AL-NI.json", "/bibliography/systems/{file}": "AL-NI.json",
+                       "/bibliography/papers/{file}": _bib_example_file()}[path]
             concrete = concrete.replace("{%s}" % name, val)
         root = SITE_DIR if on_site else DATA_DIR
         assert (root / concrete.lstrip("/")).is_file(), f"{path} -> {concrete} missing in {root}"

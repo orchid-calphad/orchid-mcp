@@ -139,6 +139,23 @@ def _struct_norm(x: Any) -> str:
     return re.sub(r"[\s_\-()'′,.]", "", str(x)).lower()
 
 
+# ---------------------------------------------------------------- bibliography
+BIB_ROLES = (
+    "corpus_assessment_read", "cited_original_source", "tdb_source_assessment", "tdb_compilation",
+    "handbook_diagram_source", "discovery_lead", "context_source", "espei_reference",
+)
+BIB_RELATIONS = (
+    "cites", "used_in_assessment", "models_system_in_tdb", "reassesses", "handbook_reproduces", "cited_by_crossref",
+)
+BIB_DIRECTIONS = ("out", "in", "both")
+BIB_USED_MAX = 25
+BIB_CITE_TEXT = (
+    "Cite the papers themselves when you use their data (doi / citation of each record), and the ORCHID "
+    "bibliography (bibliography/CITATION.cff; Zenodo record 'bibliography'). Crossref metadata is CC0; ORCHID-derived "
+    "fields (roles, evidence counts, relations) are CC BY 4.0."
+)
+
+
 class OrchidError(ValueError):
     """A tool-level error with a message meant for the caller."""
 
@@ -1102,13 +1119,23 @@ class Orchid:
         return self._wrap(out)
 
     # ------------------------------------------------------------------ papers
-    def get_paper(self, doi: str) -> dict[str, Any]:
-        """Bibliographic record of a paper (by DOI or ORCHID paper id), its systems, values and contexts."""
-        papers = self._papers()
+    def get_paper(self, doi: str, fields: str = "summary") -> dict[str, Any]:
+        """Bibliographic record of a paper (by DOI or ORCHID paper id), its systems, values and contexts, and its
+        bibliography entry (roles, evidence summary; fields='full' adds relations and the full record)."""
+        fields = _check_fields(fields)
+        try:
+            papers = self._papers()
+        except NotFound:  # a data source with the bibliography only
+            papers = {}
         q = doi.strip()
         pid = q if q.split(":", 1)[0] in ("doi", "sha256", "ref", "unresolved") and q in papers else f"doi:{_norm_doi(q)}"
+        bib = self._bib_paper(q, required=False)
         if pid not in papers:
-            raise OrchidError(f"paper {doi!r} not in ORCHID (id tried: {pid})")
+            if bib is None:
+                raise OrchidError(f"paper {doi!r} not in ORCHID (id tried: {pid})")
+            return self._wrap({"paper": None, "bibliography": self._bib_view(bib, fields),
+                               "note": "Known to the ORCHID bibliography only (no literature values read from it).",
+                               "how_to_cite_bibliography": BIB_CITE_TEXT})
         rec = papers[pid]
         reported: dict[str, dict[str, int]] = {}
         cited = 0
@@ -1126,18 +1153,231 @@ class Orchid:
                 elif any((c or {}).get("paper") == pid for c in r.get("cited_sources") or []):
                     cited += 1
         ctx = self.data.read_json("literature/contexts.json").get(pid)
-        return self._wrap(
-            {
-                "paper": rec,
-                "systems": rec.get("systems") or [],
-                "n_values_reported": sum(v["values"] for v in reported.values()),
-                "values_by_system": reported,
-                "n_values_citing_this_as_source_in_its_systems": cited,
-                "experimental_context": ctx,
-                "n_context_items": len((ctx or {}).get("items", [])),
-                "note": "Bibliographic record only; ORCHID does not redistribute the paper. Context items carry their quote and page.",
-            }
-        )
+        out = {
+            "paper": rec,
+            "systems": rec.get("systems") or [],
+            "n_values_reported": sum(v["values"] for v in reported.values()),
+            "values_by_system": reported,
+            "n_values_citing_this_as_source_in_its_systems": cited,
+            "experimental_context": ctx,
+            "n_context_items": len((ctx or {}).get("items", [])),
+            "note": "Bibliographic record only; ORCHID does not redistribute the paper. Context items carry their quote and page.",
+        }
+        if bib is None:
+            bib = self._bib_paper(pid, required=False)
+        if bib is not None:
+            out["bibliography"] = self._bib_view(bib, fields)
+            out["how_to_cite_bibliography"] = BIB_CITE_TEXT
+        return self._wrap(out)
+
+    # ------------------------------------------------------------- bibliography
+    def _bib_index(self) -> dict[str, Any]:
+        try:
+            idx = self.data.read_json("bibliography/index.json")
+        except NotFound as exc:
+            raise OrchidError("the bibliography (bibliography/index.json) is not in this ORCHID data source") from exc
+        if "_by" not in idx:
+            cols = idx["columns"]
+            rows = [dict(zip(cols, r)) for r in idx["rows"]]
+            by: dict[str, str] = {}
+            for r in rows:
+                by[r["id"]] = r["key"]
+                if r.get("doi"):
+                    by["doi:" + r["doi"]] = r["key"]
+            idx["_rows"] = rows
+            idx["_by"] = by
+        return idx
+
+    def _bib_key(self, q: str) -> str | None:
+        idx = self._bib_index()
+        q = (q or "").strip()
+        if not q:
+            raise OrchidError("give a DOI or a bibliography id")
+        if re.fullmatch(r"p[0-9a-f]{16}", q):
+            return q if any(r["key"] == q for r in idx["_rows"]) else None
+        if q.startswith(("nodoi:", "doi:")) and q in idx["_by"]:
+            return idx["_by"][q]
+        return idx["_by"].get("doi:" + _norm_doi(q.removeprefix("doi:")))
+
+    def _bib_paper(self, q: str, required: bool = True) -> dict[str, Any] | None:
+        try:
+            key = self._bib_key(q)
+        except OrchidError:
+            if required:
+                raise
+            return None
+        if key is None:
+            if required:
+                raise OrchidError(f"paper {q!r} not in the ORCHID bibliography")
+            return None
+        return self.data.read_json(f"bibliography/papers/{key}.json")
+
+    @staticmethod
+    def _bib_summary_record(r: dict[str, Any]) -> dict[str, Any]:
+        es = r.get("evidence_summary") or {}
+        ev = {}
+        for k in ("reported", "cited_as_source"):
+            if k in es:
+                ev[k] = {x: es[k][x] for x in ("n_values", "n_values_accepted", "by_evidence_class", "by_property_group",
+                                                "n_tables", "n_text_passages", "n_citing_papers") if x in es[k]}
+        for k in ("espei_datasets", "phase_registry_phases"):
+            if k in es:
+                ev["n_" + k] = len(es[k])
+        if "assessed_assemblage_records" in es:
+            ev["assessed_assemblage_records"] = es["assessed_assemblage_records"]
+        rd = {}
+        for role, d in (r.get("role_details") or {}).items():
+            d = dict(d)
+            if "tdb_files" in d:
+                d["tdb_files"] = [{k: t.get(k) for k in ("file", "system", "sha256", "bundled")} for t in d["tdb_files"]]
+            rd[role] = d
+        return {
+            "id": r["id"], "key": r["key"], "doi": r.get("doi"), "citation": r.get("citation"), "title": r.get("title"),
+            "authors": [a.get("family") or a.get("name") for a in r.get("authors") or []][:10],
+            "year": r.get("year"), "container_title": r.get("container_title"), "type": r.get("type"),
+            "systems": r.get("systems") or [], "roles": r.get("roles") or [], "role_details": rd,
+            "evidence_summary": ev, "availability": r.get("availability"),
+            "is_referenced_by_count": r.get("is_referenced_by_count"),
+            "is_referenced_by_count_retrieved": r.get("is_referenced_by_count_retrieved"),
+            "doi_check": r.get("doi_check"), "relation_counts": r.get("relation_counts"), "urls": r.get("urls"),
+        }
+
+    def _bib_view(self, doc: dict[str, Any], fields: str) -> dict[str, Any]:
+        r = doc["paper"]
+        if fields == "full":
+            return {"record": r, "relations": doc.get("relations") or []}
+        return self._bib_summary_record(r)
+
+    @staticmethod
+    def _bib_row(r: dict[str, Any]) -> dict[str, Any]:
+        return {k: r.get(k) for k in ("id", "key", "doi", "title", "year", "container", "authors", "roles", "systems",
+                                      "values_reported", "values_cited")} | {
+            "data_url": f"{PUBLIC_DATA_URL}bibliography/papers/{r['key']}.json"}
+
+    def search_papers(
+        self,
+        system: str | None = None,
+        elements: list[str] | None = None,
+        role: str | None = None,
+        property: str | None = None,
+        evidence_class: str | None = None,
+        year_from: int | None = None,
+        year_to: int | None = None,
+        text: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Papers of the bibliography filtered by exact system, elements, role, property code, evidence class,
+        year range and title/author text."""
+        sid = self._sys(system) if system else None
+        try:
+            want = {element(x) for x in elements or []}
+        except ChemError as exc:
+            raise OrchidError(str(exc)) from exc
+        if role and role not in BIB_ROLES:
+            raise OrchidError(f"role must be one of {BIB_ROLES}")
+        if evidence_class and evidence_class not in EVIDENCE_CLASSES[:4]:
+            raise OrchidError(f"evidence_class must be one of {EVIDENCE_CLASSES[:4]}")
+        prop = (property or "").strip().upper()
+        tq = re.sub(r"\s+", " ", (text or "").strip().lower())
+        rows = []
+        for r in self._bib_index()["_rows"]:
+            if sid and sid not in r["systems"]:
+                continue
+            if want and not any(want <= set(s.split("-")) for s in r["systems"]):
+                continue
+            if role and role not in r["roles"]:
+                continue
+            if prop and prop not in r["properties"]:
+                continue
+            if evidence_class and evidence_class not in r["evidence_classes"]:
+                continue
+            y = r.get("year")
+            if year_from is not None and (y is None or y < int(year_from)):
+                continue
+            if year_to is not None and (y is None or y > int(year_to)):
+                continue
+            if tq:
+                hay = " ".join([str(r.get("title") or ""), " ".join(r.get("authors") or []), str(r.get("doi") or "")]).lower()
+                if tq not in re.sub(r"\s+", " ", hay):
+                    continue
+            rows.append(r)
+        rows.sort(key=lambda r: (r.get("year") or 0, r["id"]))
+        lim, off = max(1, min(int(limit), 500)), max(0, int(offset))
+        page = rows[off : off + lim]
+        return self._wrap({
+            "query": {"system": sid, "elements": sorted(want), "role": role, "property": prop or None,
+                      "evidence_class": evidence_class, "year_from": year_from, "year_to": year_to, "text": text},
+            "total": len(rows), "offset": off, "returned": len(page), "truncated": off + lim < len(rows),
+            "papers": [self._bib_row(r) for r in page],
+            "roles": list(BIB_ROLES),
+            "how_to_cite_bibliography": BIB_CITE_TEXT,
+        })
+
+    def get_paper_relations(
+        self, doi: str, relation: str | None = None, direction: str = "both", limit: int = 100, offset: int = 0
+    ) -> dict[str, Any]:
+        """Typed relations of one paper (edges with provenance)."""
+        if relation and relation not in BIB_RELATIONS:
+            raise OrchidError(f"relation must be one of {BIB_RELATIONS}")
+        d = (direction or "both").strip().lower()
+        if d not in BIB_DIRECTIONS:
+            raise OrchidError(f"direction must be one of {BIB_DIRECTIONS}")
+        doc = self._bib_paper(doi)
+        rels = [x for x in doc.get("relations") or []
+                if (not relation or x["type"] == relation) and (d == "both" or x["direction"] == d)]
+        rels.sort(key=lambda x: (x["type"], x["direction"], -(x.get("count") or 0), x["other"]["id"]))
+        lim, off = max(1, min(int(limit), 1000)), max(0, int(offset))
+        page = rels[off : off + lim]
+        by_type: dict[str, dict[str, int]] = {}
+        for x in rels:
+            by_type.setdefault(x["type"], {"out": 0, "in": 0})[x["direction"]] += 1
+        return self._wrap({
+            "paper": self._bib_summary_record(doc["paper"]) | {"evidence_summary": None, "role_details": None},
+            "query": {"relation": relation, "direction": d},
+            "total": len(rels), "offset": off, "returned": len(page), "truncated": off + lim < len(rels),
+            "counts_by_type": by_type, "relations": page,
+            "relation_types": {
+                "cites": "paper ORCHID read -> work printed as the source of its values (count = values)",
+                "used_in_assessment": "original data paper -> paper/assessment that used it (inverse of cites)",
+                "models_system_in_tdb": "paper -> TDB file whose header cites it",
+                "reassesses": "later assessment -> earlier assessment of the same exact system it cites",
+                "handbook_reproduces": "handbook diagram -> original evaluation",
+                "cited_by_crossref": "src's publisher-deposited Crossref reference list contains dst",
+            },
+            "how_to_cite_bibliography": BIB_CITE_TEXT,
+        })
+
+    def get_assessment_evidence(self, system: str, max_data_papers: int = BIB_USED_MAX) -> dict[str, Any]:
+        """Assessments of an exact system with the original data papers they used, counts, and reassessment links."""
+        sid = self._sys(system)
+        self._bib_index()
+        try:
+            doc = self.data.read_json(f"bibliography/systems/{sid}.json")
+        except NotFound as exc:
+            raise OrchidError(f"no papers for {sid} in the ORCHID bibliography") from exc
+        mx = max(0, min(int(max_data_papers), 500))
+        assessments = []
+        chain = []
+        for a in doc.get("assessments") or []:
+            used = a.get("data_papers_used") or []
+            assessments.append({**{k: v for k, v in a.items() if k != "data_papers_used"},
+                                "data_papers_used": used[:mx], "data_papers_truncated": len(used) > mx,
+                                "data_url": f"{PUBLIC_DATA_URL}bibliography/papers/{a['key']}.json"})
+            for earlier in a.get("reassesses") or []:
+                chain.append({"later": a["id"], "earlier": earlier, "method": "citation+same-system"})
+        return self._wrap({
+            "system": sid,
+            "n_assessments": len(assessments),
+            "assessments": assessments,
+            "reassessment_links": chain,
+            "papers_by_role": {k: len(v) for k, v in (doc.get("papers_by_role") or {}).items()},
+            "data_url": f"{PUBLIC_DATA_URL}bibliography/systems/{sid}.json",
+            "static_page_url": f"{PUBLIC_DATA_URL}bibliography/pages/systems/{sid}.html",
+            "note": "Assessments = papers behind a TDB file of this system or read by ORCHID; data papers used = works "
+                    "printed as the source of the values ORCHID extracted from the assessment (cites edges).",
+            "how_to_cite_bibliography": BIB_CITE_TEXT,
+        })
 
     # ---------------------------------------------------------- phase registry
     def _phase_index(self) -> dict[str, Any]:
@@ -1419,6 +1659,7 @@ class Orchid:
             "schema": [("data", "literature/SCHEMA.md")],
             "dataset-card": [("data", "README.md"), ("data", "CITATION.cff")],
             "licence": [("data", "LICENSES.md"), ("data", "NOTICE.md"), ("data", "LICENSE")],
+            "bibliography-schema": [("data", "bibliography/SCHEMA.md")],
         }[name]
         parts = []
         for which, p in paths:
