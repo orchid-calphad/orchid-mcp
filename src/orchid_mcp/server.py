@@ -25,7 +25,8 @@ SERVER_NAME = "orchid"
 INSTRUCTIONS = (
     "ORCHID: CALPHAD thermodynamic data with provenance. Literature values (experimental | model | dft | "
     "unspecified, never mixed), calculated binary phase diagrams tied to TDB files by SHA-256, Materials Project "
-    "and OQMD formation energies, and the TDB catalog. Every value carries its citation, DOI, page and quote; "
+    "and OQMD formation energies, the TDB catalog, and the phase registry (every name of each binary "
+    "phase, its TDB models, stability and crystal structure when certain). Every value carries its citation, DOI, page and quote; "
     "report them, and cite ORCHID plus the original sources (see the cite_orchid prompt)."
 )
 
@@ -183,6 +184,41 @@ def compare_to_dft(system: str, default_subset_only: bool = False, fields: Field
     return _call(orchid().compare_to_dft, system=system, default_subset_only=default_subset_only, fields=fields)
 
 
+def get_phase(system: str, phase: str, fields: Fields = "summary") -> dict:
+    """One phase of a binary system from the ORCHID phase registry. system: e.g. "Al-Ni". phase: a registry id
+    ("phase:al-ni:fcc-l12"), any namespaced name ("tdb:AlNi-01Dup-LB.tdb:L12_FCC", "paper:<doi>:<label>",
+    "corpus:<id>", "mp:<id>", "oqmd:<id>") or a plain label ("L12_FCC", "NI3TI", "gamma'"); several matches return
+    {ambiguous: true, matches}. Summary: structure (tier A name / B DFT-supported / C assessor-stated, prototype,
+    Strukturbericht, Pearson, space group), names by namespace, TDB models with their verbatim PHASE and CONSTITUENT
+    statements, stability per calculated diagram, literature counts, first 5 reference DOIs, viewer URL.
+    fields="full": the complete record (tdb_definition with TYPE_DEFINITIONs, parsed model and parameter counts,
+    all example references with citations, candidates)."""
+    return _call(orchid().get_phase, system=system, phase=phase, fields=fields)
+
+
+def search_phases(
+    elements: list[str] | None = None,
+    name: str | None = None,
+    prototype: str | None = None,
+    tier: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    """Search the ORCHID phase registry (binary systems). elements: phases of systems containing all of them.
+    name: substring of the phase name, TDB names, paper or corpus labels. prototype: prototype, Strukturbericht,
+    Pearson symbol or structure-type id ("AuCu3", "L1_2" = "L12", "cP4"). tier: A | B | C | liquid | gas | none.
+    status: assigned | needs_review | unresolved_no_candidates. Paginate with offset; `total` counts all matches."""
+    return _call(orchid().search_phases, elements=elements, name=name, prototype=prototype, tier=tier, status=status, limit=limit, offset=offset)
+
+
+def get_structure_type(query: str) -> dict:
+    """Crystal-structure types of the phase registry by id, prototype, Strukturbericht, Pearson symbol or space
+    group ("AuCu3", "L1_2", "cP4", "Pm-3m", "221"): prototype, Strukturbericht, Pearson, space group, sources
+    (Hallstedt 2025 crystallographic table, standard tables), number of registry phases and example phase ids."""
+    return _call(orchid().get_structure_type, query=query)
+
+
 TOOLS: list[Callable[..., dict]] = [
     search_systems,
     get_system_data,
@@ -193,6 +229,9 @@ TOOLS: list[Callable[..., dict]] = [
     get_tdb,
     get_paper,
     compare_to_dft,
+    get_phase,
+    search_phases,
+    get_structure_type,
 ]
 
 RESOURCES = {

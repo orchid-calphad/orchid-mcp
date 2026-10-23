@@ -90,6 +90,9 @@ Omit `env` to use the online data.
 | `list_tdb_files(elements, exact, tier, limit=50, offset, fields)` / `get_tdb(file)` | licence, tier, SHA-256, download URL (`full`: whole catalog entry); file content **only** for bundled, confirmed-licence files |
 | `get_paper(doi)` | bibliographic record, systems, number of values, experimental-context items with quotes |
 | `compare_to_dft(system, fields)` | literature vs MP vs OQMD formation enthalpies with residuals and the DFT hull vertices |
+| `get_phase(system, phase, fields)` | one phase of the phase registry by id, namespaced name (`tdb:`, `paper:`, `corpus:`, `mp:`, `oqmd:`) or label (`L12_FCC`, `NI3TI`): structure (tier A/B/C), names, TDB models with verbatim PHASE/CONSTITUENT lines, stability, first 5 reference DOIs (`full`: `tdb_definition`, all references, candidates) |
+| `search_phases(elements, name, prototype, tier, status, limit=50, offset)` | phases filtered by elements, name/label, prototype / Strukturbericht / Pearson (`L1_2` = `L12`), tier (A, B, C, liquid, gas, none) |
+| `get_structure_type(query)` | structure types by id, prototype, Strukturbericht, Pearson or space group, with sources, number of registry phases and example phase ids |
 
 ### Response size: `fields` and paging
 
@@ -127,13 +130,15 @@ served (only their original-source links).
 - "Which phases are stable in Ni–Ti at x(Ti)=0.5 and 1200 K according to NiTi-04Tok?"
 - "List the Cu–Zr TDB files I can download and their licences."
 - "What experimental conditions did doi:10.1016/j.tca.2010.10.005 use?"
+- "Which binary phases have the L1_2 (AuCu3) structure, and how is NI3TI modelled in the SGTE TDB files?"
 
 ## Static JSON API
 
 `openapi/openapi.yaml` (OpenAPI 3.1) documents the read-only file layout: `GET /literature/index.json`,
 `/literature/systems/{SYS}.json`, `/literature/papers.json`, `/phase-diagrams/index.json`,
 `/phase-diagrams/sgte/{file}`, `/hulls/dft-mp/{A}/{A}-{B}.json`, `/hulls/dft-oqmd/...`, `/hulls/calphad-sgte/...`
-and, on `https://orchid-project.org/data`, `/catalog.json` and `/databases/{collection}/{file}`.
+`/phases/registry.json` (compact index), `/phases/systems/{SYS}.json` (full phase records),
+`/phases/structure_types.json` and, on `https://orchid-project.org/data`, `/catalog.json` and `/databases/{collection}/{file}`.
 
 ## Tests
 

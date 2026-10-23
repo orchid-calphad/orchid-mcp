@@ -37,6 +37,8 @@ tags:
     description: Binary phase diagrams calculated with pycalphad from the SGTE binary collection.
   - name: hulls
     description: Binary convex hulls (Materials Project, OQMD, CALPHAD isotherms).
+  - name: phases
+    description: Phase registry (binary systems) — every name of a phase, its TDB models, stability and structure type.
   - name: catalog
     description: TDB catalog and bundled TDB files (served from orchid-project.org/data).
   - name: release
@@ -317,6 +319,76 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/HullDocument" }
 
+  /phases/registry.json:
+    get:
+      tags: [phases]
+      operationId: getPhaseRegistryIndex
+      summary: Compact index of every phase (id, system, names, structure tier and prototype, counts)
+      description: |
+        One row per (binary system, phase): `{id, system, elements, preferred_name, status, structure, names[],
+        tdb_names[], stoichiometry, counts, detail}`. The full record of a phase is in the file named by `detail`
+        (`systems/{system}.json`). Field reference: `/phases/SCHEMA.md`.
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+  /phases/systems/{file}:
+    get:
+      tags: [phases]
+      operationId: getPhaseRegistrySystem
+      summary: Full phase records of one binary system
+      description: |
+        `{file}` is `{system}.json`. `{system, release, phases[], structure_types{}, cite_as}`; each phase carries
+        names by namespace, TDB models with `tdb_definition` (verbatim PHASE / CONSTITUENT / TYPE_DEFINITION
+        statements), stability per calculated diagram, literature counts and example references.
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[A-Z][A-Z]?-[A-Z][A-Z]?\\.json$" }
+          example: AL-NI.json
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /phases/structure_types.json:
+    get:
+      tags: [phases]
+      operationId: getStructureTypes
+      summary: Structure types (prototype, Strukturbericht, Pearson symbol, space group) with their sources
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+  /phases/index.json:
+    get:
+      tags: [phases]
+      operationId: getPhaseSearchIndex
+      summary: Website search index of the phase registry (column arrays)
+      responses:
+        "200": { $ref: "#/components/responses/AnyJson" }
+  /phases/SCHEMA.md:
+    get:
+      tags: [phases]
+      operationId: getPhaseRegistrySchema
+      summary: Field reference of the phase registry
+      responses:
+        "200": { $ref: "#/components/responses/Markdown" }
+  /phases/registry.csv:
+    get:
+      tags: [phases]
+      operationId: getPhaseRegistryCsv
+      summary: One flat row per phase
+      responses:
+        "200":
+          description: CSV
+          content:
+            text/csv: { schema: { type: string } }
+  /phases/registry.jsonld:
+    get:
+      tags: [phases]
+      operationId: getPhaseRegistryJsonLd
+      summary: The phases as a schema.org DefinedTermSet (JSON-LD)
+      responses:
+        "200":
+          description: JSON-LD
+          content:
+            application/ld+json: { schema: { type: object } }
   /catalog.json:
     servers:
       - url: https://orchid-project.org/data
