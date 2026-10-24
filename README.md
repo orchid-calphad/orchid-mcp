@@ -97,6 +97,15 @@ Omit `env` to use the online data.
 | `search_phases(elements, name, prototype, tier, status, limit=50, offset)` | phases filtered by elements, name/label, prototype / Strukturbericht / Pearson (`L1_2` = `L12`), tier (A, B, C, liquid, gas, none) |
 | `get_structure_type(query)` | structure types by id, prototype, Strukturbericht, Pearson or space group, with sources, number of registry phases and example phase ids |
 
+### Reporting an error: `report_issue_url`
+
+Every literature value (summary and `full` records, and the literature entries of `compare_to_dft`) carries
+`report_issue_url`: a link to the GitHub issue form "Report an error in a value" of orchid-calphad/orchid-data,
+pre-filled with the record id, chemical system, DOI and page of the source and the value as shown, and nothing else
+(never anything about the user). An assistant can hand the link to the user when a value looks wrong; the user
+submits the form. The server never posts, opens or sends anything. The same links are on the static data pages
+(`report` next to each value); how contributions are checked and credited: orchid-data `CONTRIBUTING.md`.
+
 ### Response size: `fields` and paging
 
 List-returning tools default to `fields="summary"`. A summary literature value carries `id`, `property`, `value`,
@@ -157,6 +166,12 @@ ORCHID_TEST_DATA_DIR=~/projects/orchid-data ORCHID_TEST_SITE_DATA_DIR=~/projects
 
 Tests read local data only; network access fails the run. The stdio smoke test runs against both the built-in
 fallback and the SDK server (skipped if `mcp` is not installed).
+
+## Contributing
+
+See `CONTRIBUTING.md` (bugs, new tools, tests; MIT with a DCO sign-off) and the
+[Code of Conduct](CODE_OF_CONDUCT.md). Wrong values and data contributions go to
+[orchid-data](https://github.com/orchid-calphad/orchid-data/blob/main/CONTRIBUTING.md).
 
 ## Licence
 

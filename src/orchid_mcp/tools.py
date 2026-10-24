@@ -18,6 +18,7 @@ from typing import Any, Iterable
 
 from .chem import ChemError, composition_system, element, parse_formula, pretty_system, system_id
 from .datasource import DataSource, DataSourceError, NotFound, sources_from_env
+from .report import REPORT_NOTE, report_issue_url, report_url_for
 
 SITE_URL = "https://orchid-project.org/"
 PUBLIC_DATA_URL = "https://data.orchid-project.org/"
@@ -134,6 +135,7 @@ def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
             "quote": _short(src.get("quote")),
         }
     )
+    out["report_issue_url"] = r.get("report_issue_url") or report_url_for(r)
     # literature-level consistency gates: codes of the gates that demoted / flagged the value, rules that corrected it
     gf = [g.get("code") for g in r.get("gate_failures") or [] if isinstance(g, dict) and g.get("code")]
     if gf:
@@ -280,6 +282,7 @@ class Orchid:
                 "prior, sigma_composition, sigma_scatter, sigma_conversion) and sigma_effective = max(sqrt(max("
                 "printed, reading, method)^2 + composition^2 + conversion^2), scatter), the recommended sigma; "
                 "printed values and printed uncertainties are unchanged (literature/UNCERTAINTY_CALIBRATION.md).",
+                REPORT_NOTE,
                 "Quotes are single sentences reproduced under fair use so each value can be verified; "
                 "source papers are not redistributed.",
             ],
@@ -345,6 +348,7 @@ class Orchid:
                 "table value: no sentence quote; verify with the table label/caption/page/row in `locator`"
             )
         r["source"] = src
+        r["report_issue_url"] = report_url_for(r)   # pre-filled issue form; never posted by the server
         return r
 
     def _contexts_for(self, records: list[dict[str, Any]], doc: dict[str, Any]) -> dict[str, Any]:
@@ -971,6 +975,9 @@ class Orchid:
                     "quote": rec.get("quote"),
                     "record_kind": rec.get("kind"),
                     "reported_in_system": rec.get("sys"),
+                    "report_issue_url": report_issue_url(
+                        rid, rec.get("sys") or sid, pap.get("doi"), rec.get("page"),
+                        None if rec.get("lit") is None else "%s kJ/mol-atom" % rec.get("lit")),
                     "own_work_of_paper": rec.get("own"),
                     "cited_sources": rec.get("cited"),
                     "flags": {
@@ -1020,6 +1027,7 @@ class Orchid:
                     "quote": _short(full["quote"]),
                     "table": full["table"],
                     "residual_dft_minus_lit": {d["source"]: d["residual_dft_minus_lit"] for d in full["dft_points"]},
+                    "report_issue_url": full["report_issue_url"],
                 }
         stats = {}
         for src, rs in resid.items():
