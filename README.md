@@ -100,7 +100,7 @@ Omit `env` to use the online data.
 ### Response size: `fields` and paging
 
 List-returning tools default to `fields="summary"`. A summary literature value carries `id`, `property`, `value`,
-`unit`, `T_K`, `phases`, `reaction` (invariants), `evidence_class`, `accepted`, `espei_ready` (usable in ESPEI: complete state, phase mapped to a model, physical phase rule), `espei_certified` (ESPEI-ready and agreeing with a pycalphad calculation from the linked TDB), `calphad_check` (`agrees` / `disagrees` / `not_available`), `citation`, `doi`, `page` and a
+`unit`, `T_K`, `phases`, `reaction` (invariants), `evidence_class`, `accepted`, `espei_ready` (usable in ESPEI: complete state, phase mapped to a model, physical phase rule), `espei_certified` (ESPEI-ready and agreeing with a pycalphad calculation from the linked TDB), `calphad_check` (`agrees` / `disagrees` / `not_available`), `gate_failures` (codes of the literature-level gates that demoted or flagged the value, when any) and `corrected_by` (rules of gate corrections, when any; the stored value is in the full record), `citation`, `doi`, `page` and a
 `quote` shortened to 240 characters, or `table` (label and row) for table values. `fields="full"` returns the
 complete record with all provenance (locator, origin, flags, uncertainty, conditions, cited sources, model link).
 Paged tools report `total`, `offset`, `returned`/`truncated` and (for `get_system_data`) `next_offset`. With the
