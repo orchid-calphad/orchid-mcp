@@ -98,6 +98,13 @@ def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
             "quote": _short(src.get("quote")),
         }
     )
+    # literature-level consistency gates: codes of the gates that demoted / flagged the value, rules that corrected it
+    gf = [g.get("code") for g in r.get("gate_failures") or [] if isinstance(g, dict) and g.get("code")]
+    if gf:
+        out["gate_failures"] = gf
+    cr = [c.get("rule") for c in r.get("corrections") or [] if isinstance(c, dict) and c.get("rule")]
+    if cr:
+        out["corrected_by"] = cr
     if src.get("quote") is None and isinstance(loc, dict) and loc.get("label") is not None:
         kind = loc.get("artifact") or "table"
         out["table"] = f"{kind} {loc.get('label')}" + (f", row {loc['row']}" if loc.get("row") is not None else "")
