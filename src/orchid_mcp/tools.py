@@ -41,6 +41,14 @@ FIELDS_NOTE = (
 )
 
 
+
+def _ehull_eV(v):
+    """The DFT parity file stores the energy above hull in kJ/mol-atom (build_dft_parity.py); eV/atom = kJ/mol / 96.485."""
+    try:
+        return None if v is None else round(float(v) / 96.485, 5)
+    except (TypeError, ValueError):
+        return None
+
 def _check_fields(fields: str) -> str:
     f = (fields or "summary").strip().lower()
     if f not in FIELDS:
@@ -945,7 +953,7 @@ class Orchid:
                             "residual_dft_minus_lit": p.get("res"),
                             "material_id": p.get("mid"),
                             "spacegroup": p.get("sg"),
-                            "e_above_hull_eV": p.get("ehull"),
+                            "e_above_hull_kJ_per_mol_atom": p.get("ehull"), "e_above_hull_eV": _ehull_eV(p.get("ehull")),
                             "n_polymorphs": p.get("npoly"),
                             "theoretical": p.get("theoretical"),
                         }
@@ -956,7 +964,7 @@ class Orchid:
             for p in points.get(rid, []):
                 c["dft"].setdefault(
                     p.get("src"),
-                    {"kJ_per_mol_atom": p.get("dft"), "material_id": p.get("mid"), "spacegroup": p.get("sg"), "e_above_hull_eV": p.get("ehull")},
+                    {"kJ_per_mol_atom": p.get("dft"), "material_id": p.get("mid"), "spacegroup": p.get("sg"), "e_above_hull_kJ_per_mol_atom": p.get("ehull"), "e_above_hull_eV": _ehull_eV(p.get("ehull"))},
                 )
                 if in_default and _f(p.get("res")) is not None:
                     resid[p["src"]].append(float(p["res"]))
