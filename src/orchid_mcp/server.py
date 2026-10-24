@@ -81,7 +81,7 @@ def get_system_data(
     phase equilibrium, formation, mixing / partial, heat capacity / entropy / enthalpy, activity / EMF / Gibbs
     energy, crystal structure, model expression, other property), property code (HM_FORM, CPM, ...), evidence_class
     (experimental|model|dft|unspecified). Paginate with limit/offset (default 50); `total` counts all matches.
-    fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page,
+    fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, espei_ready, espei_certified, calphad_check, citation, DOI, page,
     quote <= 240 chars or table locator) or "full" (every field with expanded provenance: locator, origin, flags,
     uncertainty, conditions, cited sources, model link; compact=true then drops pipeline bookkeeping)."""
     return _call(
@@ -111,7 +111,7 @@ def get_invariant_reactions(
     SGTE assessment (source="calculated"), or both side by side with phase-set matches and dT. Calculated
     invariants are matched against all literature records; the literature list is paged with limit/offset
     (literature_total counts all).
-    fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page,
+    fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, espei_ready, espei_certified, calphad_check, citation, DOI, page,
     quote <= 240 chars or table locator) or "full" (complete provenance)."""
     return _call(
         orchid().get_invariant_reactions,
@@ -130,7 +130,7 @@ def get_formation_enthalpy(
 ) -> dict:
     """Formation enthalpy of a compound (e.g. "Al3Ni"): literature values in kJ/mol-atom with provenance,
     Materials Project and OQMD DFT entries at that composition, and per-evidence-class / per-source summaries.
-    fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page,
+    fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, espei_ready, espei_certified, calphad_check, citation, DOI, page,
     quote <= 240 chars or table locator) or "full" (complete provenance)."""
     return _call(
         orchid().get_formation_enthalpy,
