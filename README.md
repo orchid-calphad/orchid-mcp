@@ -101,7 +101,12 @@ Omit `env` to use the online data.
 
 List-returning tools default to `fields="summary"`. A summary literature value carries `id`, `property`, `value`,
 `unit`, `T_K`, `phases`, `reaction` (invariants), `evidence_class`, `accepted`, `espei_ready` (usable in ESPEI: complete state, phase mapped to a model, physical phase rule), `espei_certified` (ESPEI-ready and agreeing with a pycalphad calculation from the linked TDB), `calphad_check` (`agrees` / `disagrees` / `not_available`), `gate_failures` (codes of the literature-level gates that demoted or flagged the value, when any) and `corrected_by` (rules of gate corrections, when any; the stored value is in the full record), `citation`, `doi`, `page` and a
-`quote` shortened to 240 characters, or `table` (label and row) for table values. `fields="full"` returns the
+`quote` shortened to 240 characters, or `table` (label and row) for table values. Each summary also carries `uncertainty_budget`: per
+quantity (`value`, `composition`, `temperature_K`) the components in the quantity's unit (`sigma_printed`,
+`sigma_reading`, `sigma_method` {value, class, basis}, `sigma_composition`, `sigma_scatter`, `sigma_conversion`) and
+`sigma_effective`, plus `sigma_rule` = max(sqrt(max(printed, reading, method)^2 + composition^2 + conversion^2),
+scatter) and the calibration version. `sigma_effective` is the recommended sigma; method floors are calibrated from
+ORCHID duplicate measurements or documented priors (`literature/UNCERTAINTY_CALIBRATION.md`). `fields="full"` returns the
 complete record with all provenance (locator, origin, flags, uncertainty, conditions, cited sources, model link).
 Paged tools report `total`, `offset`, `returned`/`truncated` and (for `get_system_data`) `next_offset`. With the
 SDK, results are sent as one compact JSON text block.
@@ -123,7 +128,7 @@ Resources: `orchid://schema` (SCHEMA.md), `orchid://bibliography-schema` (biblio
 
 Rules the tools keep: evidence classes (experimental, model, dft, unspecified) are never mixed or averaged; MP and
 OQMD use different energy references and are never averaged; each calculated diagram is one assessment;
-`uncertainty.basis: stated_default` is a placeholder, not a measurement; `fetched` and `manual` TDB files are never
+`uncertainty.basis: stated_default` is a placeholder, not a measurement (use `uncertainty_budget.sigma_effective`); `fetched` and `manual` TDB files are never
 served (only their original-source links).
 
 ## Example questions

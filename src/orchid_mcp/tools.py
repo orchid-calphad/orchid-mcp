@@ -35,8 +35,9 @@ _TDB_SUMMARY = (
 )
 QUOTE_MAX = 240
 FIELDS_NOTE = (
-    "fields='summary': id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page and a "
-    "quote shortened to 240 characters (table values: the table locator). Use fields='full' (or the ids) for "
+    "fields='summary': id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page, a "
+    "quote shortened to 240 characters (table values: the table locator) and a compact uncertainty budget "
+    "(components and sigma_effective). Use fields='full' (or the ids) for "
     "complete provenance: locator, origin, flags, uncertainty, conditions, cited sources and model links."
 )
 
@@ -71,6 +72,33 @@ def _phase_labels(phases: Any) -> list[str]:
         lab, mp = ph.get("label"), ph.get("model_phase")
         out.append(f"{lab} ({mp})" if lab and mp and mp != lab else (lab or mp or "?"))
     return out
+
+
+_BUDGET_COMPONENTS = ("sigma_printed", "sigma_reading", "sigma_composition", "sigma_scatter", "sigma_conversion")
+
+
+def summarize_budget(b: Any) -> dict[str, Any] | None:
+    """Compact form of a record's `uncertainty_budget` (literature SCHEMA.md): per quantity the component values in
+    the quantity's unit, the method floor with its class and basis, and sigma_effective; plus the rule."""
+    if not isinstance(b, dict) or not b.get("quantities"):
+        return None
+    qs: dict[str, Any] = {}
+    for name, q in sorted(b["quantities"].items()):
+        if not isinstance(q, dict):
+            continue
+        e: dict[str, Any] = {"unit": q.get("unit")}
+        for k in _BUDGET_COMPONENTS:
+            c = q.get(k)
+            e[k] = c.get("value") if isinstance(c, dict) else None
+        m = q.get("sigma_method") or {}
+        e["sigma_method"] = {"value": m.get("value"), "class": m.get("class"), "basis": m.get("basis")}
+        if m.get("value") is None and m.get("reason"):
+            e["sigma_method"]["reason"] = m["reason"]
+        e["sigma_effective"] = q.get("sigma_effective")
+        if q.get("sigma_effective") is None and q.get("sigma_effective_reason"):
+            e["sigma_effective_reason"] = q["sigma_effective_reason"]
+        qs[name] = e
+    return {"quantities": qs, "sigma_rule": b.get("sigma_rule"), "calibration": b.get("calibration")}
 
 
 def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
@@ -113,6 +141,9 @@ def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
     cr = [c.get("rule") for c in r.get("corrections") or [] if isinstance(c, dict) and c.get("rule")]
     if cr:
         out["corrected_by"] = cr
+    ub = summarize_budget(r.get("uncertainty_budget"))
+    if ub:
+        out["uncertainty_budget"] = ub
     if src.get("quote") is None and isinstance(loc, dict) and loc.get("label") is not None:
         kind = loc.get("artifact") or "table"
         out["table"] = f"{kind} {loc.get('label')}" + (f", row {loc['row']}" if loc.get("row") is not None else "")
@@ -244,6 +275,11 @@ class Orchid:
             "notes": [
                 "Evidence classes (experimental | model | dft | unspecified) are never mixed or averaged.",
                 "uncertainty.basis 'stated_default' / 'reading_resolution' is an ORCHID placeholder, not a measurement.",
+                "Every value carries uncertainty_budget: components kept separate (sigma_printed, sigma_reading, "
+                "sigma_method = method-class floor calibrated from ORCHID duplicate measurements or a documented "
+                "prior, sigma_composition, sigma_scatter, sigma_conversion) and sigma_effective = max(sqrt(max("
+                "printed, reading, method)^2 + composition^2 + conversion^2), scatter), the recommended sigma; "
+                "printed values and printed uncertainties are unchanged (literature/UNCERTAINTY_CALIBRATION.md).",
                 "Quotes are single sentences reproduced under fair use so each value can be verified; "
                 "source papers are not redistributed.",
             ],
@@ -1708,7 +1744,9 @@ def cite_orchid_prompt(topic: str = "") -> str:
         "doi:10.1063/1.4812323, release in the response) or OQMD (Saal et al., JOM 65, 1501 (2013), "
         "doi:10.1007/s11837-013-0755-4; Kirklin et al., npj Comput. Mater. 1, 15010 (2015)).\n"
         "3. Never average values across evidence classes, assessments or DFT sources. Report "
-        "`uncertainty.basis: stated_default` as 'no printed uncertainty' rather than as a measurement.\n"
+        "`uncertainty.basis: stated_default` as 'no printed uncertainty' rather than as a measurement. As the "
+        "value's uncertainty report `uncertainty_budget.quantities.value.sigma_effective` (the recommended sigma) and "
+        "say what dominates it (printed sigma or the method floor, with its class and basis).\n"
         "4. Cite the ORCHID data release you used (release string in `orchid.release`; Zenodo DOI per CITATION.cff): "
         "R. Arróyave, J. Saal, D. Shin, ORCHID data: literature thermodynamic data, calculated phase diagrams and "
         "DFT hulls, https://data.orchid-project.org (CC BY 4.0).\n"

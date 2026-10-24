@@ -212,3 +212,24 @@ def test_resources_and_prompt(orchid):
 
 def test_results_are_json(orchid):
     json.dumps(orchid.get_invariant_reactions("CU-ZR"))
+
+
+def test_summary_uncertainty_budget(orchid):
+    r = orchid.get_system_data("CU-ZR", evidence_class="experimental", property_group="formation", limit=500)
+    vals = [v for v in r["values"] if v["property"] == "HM_FORM"]
+    assert vals
+    for v in vals:
+        ub = v["uncertainty_budget"]
+        q = ub["quantities"]["value"]
+        assert ub["sigma_rule"].startswith("max(") and ub["calibration"]
+        assert set(q) >= {"unit", "sigma_printed", "sigma_reading", "sigma_method", "sigma_composition",
+                          "sigma_scatter", "sigma_conversion", "sigma_effective"}
+        if q["sigma_effective"] is not None:
+            assert q["sigma_effective"] >= 0.5 - 1e-9          # never below ESPEI's default (kJ/mol-atom)
+            if q["sigma_printed"] is not None:
+                assert q["sigma_effective"] >= q["sigma_printed"] - 1e-9
+    assert any(v["uncertainty_budget"]["quantities"]["value"]["sigma_scatter"] for v in vals)
+
+
+def test_meta_mentions_uncertainty_budget(orchid):
+    assert any("sigma_effective" in n for n in orchid.meta()["notes"])
