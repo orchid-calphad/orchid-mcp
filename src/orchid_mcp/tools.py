@@ -115,9 +115,13 @@ def ml_folds(r: dict[str, Any]) -> dict[str, Any]:
     """{chemical_system, paper_id, fold_lso, fold_lpo}: as released, else recomputed with the same rule."""
     cs = r.get("chemical_system") or r.get("system")
     pid = r.get("paper_id") or r.get("paper") or (r.get("source") or {}).get("paper")
-    return {"chemical_system": cs, "paper_id": pid,
+    out = {"chemical_system": cs, "paper_id": pid,
             "fold_lso": r["fold_lso"] if r.get("fold_lso") is not None else ml_fold(cs),
             "fold_lpo": r["fold_lpo"] if r.get("fold_lpo") is not None else ml_fold(pid)}
+    if r.get("source_system") and r.get("source_system") != cs:
+        # since audit round 2 (A1 C4) the system is that of the record's own state; the paper's system is kept
+        out["source_system"] = r["source_system"]
+    return out
 
 
 def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
@@ -969,6 +973,9 @@ class Orchid:
                 and not rec.get("unsigned")
                 and not rec.get("sign_lost")
                 and not rec.get("suspect")
+                # per-point default of build_dft_parity (structure match, composition offset, 0 K experimental;
+                # ORCHID audit round 2, A4 E1/E5/E6): a record counts when at least one of its points is default
+                and any(p.get("default", True) for p in points.get(rid, []))
             )
             if default_subset_only and not in_default:
                 continue
