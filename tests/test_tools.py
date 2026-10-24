@@ -233,3 +233,14 @@ def test_summary_uncertainty_budget(orchid):
 
 def test_meta_mentions_uncertainty_budget(orchid):
     assert any("sigma_effective" in n for n in orchid.meta()["notes"])
+
+
+def test_summary_ml_folds(orchid):
+    """Machine-learning folds in record summaries: deterministic sha256(key) mod 5, same as the release."""
+    import hashlib
+    r = orchid.get_system_data("CU-ZR", limit=50)
+    assert r["values"]
+    for v in r["values"]:
+        assert v["chemical_system"] == "CU-ZR"
+        assert v["fold_lso"] == int(hashlib.sha256(b"CU-ZR").hexdigest(), 16) % 5
+        assert v["paper_id"] and v["fold_lpo"] == int(hashlib.sha256(v["paper_id"].encode()).hexdigest(), 16) % 5
