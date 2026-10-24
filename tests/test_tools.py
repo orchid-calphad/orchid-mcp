@@ -20,7 +20,8 @@ def _check_value(v):
         assert v["locator"].get("label") is not None  # table locator instead of a sentence quote
 
 
-SUMMARY_KEYS = {"id", "property", "value", "unit", "T_K", "phases", "evidence_class", "accepted", "citation", "doi", "page", "quote"}
+SUMMARY_KEYS = {"id", "property", "value", "unit", "T_K", "phases", "evidence_class", "accepted", "espei_ready",
+                "espei_certified", "calphad_check", "citation", "doi", "page", "quote"}
 
 
 def _check_summary(v):
@@ -30,6 +31,8 @@ def _check_summary(v):
     assert v["quote"] or v.get("table")  # sentence quote or table locator
     assert v["quote"] is None or len(v["quote"]) <= 240
     assert "flags" not in v and "source" not in v
+    assert v["calphad_check"] in {"agrees", "disagrees", "not_available"}
+    assert not v["espei_certified"] or (v["espei_ready"] and v["calphad_check"] == "agrees")
 
 
 def test_chem():

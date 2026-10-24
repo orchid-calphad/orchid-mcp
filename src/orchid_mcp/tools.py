@@ -87,6 +87,11 @@ def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
         {
             "evidence_class": r.get("evidence_class"),
             "accepted": bool((r.get("flags") or {}).get("extraction_accepted")),
+            # ESPEI semantics of the release: ready = usable in ESPEI (complete state, phase mapped, physical phase
+            # rule); certified = ready AND agreement with a CALPHAD (pycalphad) prediction
+            "espei_ready": bool((r.get("flags") or {}).get("espei_ready")),
+            "espei_certified": bool((r.get("flags") or {}).get("espei_certified")),
+            "calphad_check": (r.get("flags") or {}).get("calphad_check") or "not_available",
             "citation": src.get("citation"),
             "doi": src.get("doi"),
             "page": src.get("page"),
