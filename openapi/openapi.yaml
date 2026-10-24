@@ -19,7 +19,8 @@ info:
 
     **Licence.** Derived data CC BY 4.0: cite ORCHID (see `CITATION.cff`, Zenodo DOI per release) and the original
     source of each value (paper citation/DOI, CALPHAD assessment, Materials Project, OQMD). Each literature `quote`
-    is a single sentence reproduced under fair use for verification; source papers are not redistributed. TDB files
+    is a short excerpt kept for verification; it remains under the publisher's copyright and is not relicensed;
+    source papers are not redistributed. TDB files
     keep their own licences (catalog `license` field); only `tier: bundled` files are served.
   license:
     name: CC BY 4.0 (data); MIT (catalog and code)
@@ -788,7 +789,7 @@ components:
               paper: { type: string }
         citations_printed: { type: array, items: { type: string } }
         paper: { type: string, description: "id in papers.json (doi:..., sha256:...)" }
-        quote: { type: string, description: "running text: the one verbatim sentence (fair use)" }
+        quote: { type: string, description: "running text: the short verbatim excerpt that states the value (publisher's copyright, kept for verification)" }
         quote_page: { type: integer }
         locator:
           type: object

@@ -302,8 +302,8 @@ class Orchid:
                 "printed, reading, method)^2 + composition^2 + conversion^2), scatter), the recommended sigma; "
                 "printed values and printed uncertainties are unchanged (literature/UNCERTAINTY_CALIBRATION.md).",
                 REPORT_NOTE,
-                "Quotes are single sentences reproduced under fair use so each value can be verified; "
-                "source papers are not redistributed.",
+                "Quotes are short excerpts kept so that each value can be verified; they remain under the "
+                "publishers' copyright and are not relicensed; source papers are not redistributed.",
             ],
         }
 
@@ -1777,6 +1777,6 @@ def cite_orchid_prompt(topic: str = "") -> str:
         "4. Cite the ORCHID data release you used (release string in `orchid.release`; Zenodo DOI per CITATION.cff): "
         "R. Arróyave, J. Saal, D. Shin, ORCHID data: literature thermodynamic data, calculated phase diagrams and "
         "DFT hulls, https://data.orchid-project.org (CC BY 4.0).\n"
-        "5. Quotes are single sentences reproduced under fair use for verification; do not reproduce more of the "
-        "source paper than the quote."
+        "5. Quotes are short excerpts kept for verification and remain under the publishers' copyright (not "
+        "relicensed); do not reproduce more of the source paper than the quote."
     )
