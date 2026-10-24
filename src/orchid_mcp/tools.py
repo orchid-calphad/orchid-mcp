@@ -38,7 +38,8 @@ QUOTE_MAX = 240
 FIELDS_NOTE = (
     "fields='summary': id, property, value, unit, T, phases, evidence class, accepted, citation, DOI, page, a "
     "quote shortened to 240 characters (table values: the table locator) and a compact uncertainty budget "
-    "(components and sigma_effective). Use fields='full' (or the ids) for "
+    "(components and sigma_effective), and the machine-learning folds (chemical_system, paper_id, fold_lso = "
+    "leave-chemical-system-out fold, fold_lpo = leave-paper-out fold; int(sha256(key), 16) mod 5). Use fields='full' (or the ids) for "
     "complete provenance: locator, origin, flags, uncertainty, conditions, cited sources and model links."
 )
 
@@ -102,6 +103,23 @@ def summarize_budget(b: Any) -> dict[str, Any] | None:
     return {"quantities": qs, "sigma_rule": b.get("sigma_rule"), "calibration": b.get("calibration")}
 
 
+N_FOLDS = 5
+
+
+def ml_fold(key: Any) -> int | None:
+    """Fold of the release's machine-learning splits (orchid-project.org tools/ml_folds.py): sha256 of the key mod 5."""
+    return None if not key else int(hashlib.sha256(str(key).encode("utf-8")).hexdigest(), 16) % N_FOLDS
+
+
+def ml_folds(r: dict[str, Any]) -> dict[str, Any]:
+    """{chemical_system, paper_id, fold_lso, fold_lpo}: as released, else recomputed with the same rule."""
+    cs = r.get("chemical_system") or r.get("system")
+    pid = r.get("paper_id") or r.get("paper") or (r.get("source") or {}).get("paper")
+    return {"chemical_system": cs, "paper_id": pid,
+            "fold_lso": r["fold_lso"] if r.get("fold_lso") is not None else ml_fold(cs),
+            "fold_lpo": r["fold_lpo"] if r.get("fold_lpo") is not None else ml_fold(pid)}
+
+
 def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
     """Short form of an expanded literature record (see FIELDS_NOTE)."""
     src = r.get("source") or {}
@@ -135,6 +153,7 @@ def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
             "quote": _short(src.get("quote")),
         }
     )
+    out.update(ml_folds(r))
     out["report_issue_url"] = r.get("report_issue_url") or report_url_for(r)
     # literature-level consistency gates: codes of the gates that demoted / flagged the value, rules that corrected it
     gf = [g.get("code") for g in r.get("gate_failures") or [] if isinstance(g, dict) and g.get("code")]
