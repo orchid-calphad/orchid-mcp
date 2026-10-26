@@ -40,7 +40,12 @@ FIELDS_NOTE = (
     "quote shortened to 240 characters (table values: the table locator) and a compact uncertainty budget "
     "(components and sigma_effective), and the machine-learning folds (chemical_system, paper_id, fold_lso = "
     "leave-chemical-system-out fold, fold_lpo = leave-paper-out fold; int(sha256(key), 16) mod 5). Use fields='full' (or the ids) for "
-    "complete provenance: locator, origin, flags, uncertainty, conditions, cited sources and model links."
+    "complete provenance: locator, origin, flags, uncertainty, conditions, cited sources and model links. "
+    "Summaries preserve human_review_corrections, specification_gaps, duplicate_of, evidence_identity and merged ids. "
+    "Accepted extraction does not imply fitness for fitting. Respect espei_ready and specification_gaps; "
+    "human-review corrections requiring downstream revalidation remain blocked. Count duplicate/alternate-unit "
+    "representations once using their canonical identity, and keep related observations in the same evaluation split. "
+    "Source adjudication by Codex is not independent human re-review."
 )
 
 
@@ -158,6 +163,18 @@ def summarize_record(r: dict[str, Any]) -> dict[str, Any]:
         }
     )
     out.update(ml_folds(r))
+    flags = r.get("flags") or {}
+    for key in ("review_state", "specification_gaps", "state_fully_specified"):
+        if key in flags:
+            out[key] = flags[key]
+    for key in ("duplicate_of", "evidence_identity", "merged_ids", "merged_pids"):
+        if key in r:
+            out[key] = r[key]
+    review = [c for c in r.get("corrections") or []
+              if isinstance(c, dict) and c.get("rule") == "source_adjudicated_human_review"]
+    if review:
+        # Preserve before/after values and source/adjudicator provenance without relabelling it as human validation.
+        out["human_review_corrections"] = review
     out["report_issue_url"] = r.get("report_issue_url") or report_url_for(r)
     # literature-level consistency gates: codes of the gates that demoted / flagged the value, rules that corrected it
     gf = [g.get("code") for g in r.get("gate_failures") or [] if isinstance(g, dict) and g.get("code")]
