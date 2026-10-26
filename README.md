@@ -179,3 +179,11 @@ Code: MIT (`LICENSE`). Data: derived data CC BY 4.0 — cite ORCHID (release / Z
 original sources of each value (paper, CALPHAD assessment, Materials Project, OQMD). Third-party data and TDB files
 keep their own licences (`orchid://licence`). The tools return one-sentence quotes from source papers under fair
 use, solely so each value can be verified; the papers themselves are not redistributed.
+
+## Funding
+
+This work was supported by the U.S. National Science Foundation under awards [OAC-2608825](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2608825) (CSSI Elements: PhaseForge) and [2534344](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2534344) (Autonomous Robotic Metallurgist: An NSF Materials Innovation Platform, ARM-MIP).
+
+## Software and data credits
+
+See [papers and repositories](CITATIONS.md) for pycalphad, ESPEI, PhaseForge, PhaseForge+, Materials Project, and OQMD. [Machine-readable citations](CITATIONS.json) are also provided.
