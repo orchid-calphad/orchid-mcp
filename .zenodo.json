@@ -1,0 +1,50 @@
+{
+  "title": "orchid-mcp: MCP server and Python package for ORCHID",
+  "upload_type": "software",
+  "description": "Model Context Protocol (MCP) server and Python package for querying ORCHID (Open Repository for CALPHAD Hypotheses, Intelligence, and Discovery): literature values with their thermodynamic states, evidence classes and provenance, calculated phase diagrams, TDB files, phase registry, DFT references and the bibliography, for researchers and AI agents.",
+  "creators": [
+    {
+      "name": "Arróyave, Raymundo",
+      "affiliation": "Texas A&M University",
+      "orcid": "0000-0001-7548-8686"
+    },
+    {
+      "name": "Saal, James",
+      "affiliation": "Citrine Informatics",
+      "orcid": "0000-0003-0935-158X"
+    },
+    {
+      "name": "Shin, Dongwon",
+      "affiliation": "Oak Ridge National Laboratory",
+      "orcid": "0000-0002-5797-3423"
+    }
+  ],
+  "license": "mit",
+  "keywords": [
+    "CALPHAD",
+    "thermodynamics",
+    "MCP",
+    "AI agents",
+    "phase diagrams"
+  ],
+  "communities": [
+    {
+      "identifier": "orchid-calphad"
+    }
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.23736065",
+      "relation": "isSupplementTo",
+      "scheme": "doi",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://orchid-project.org",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
+    }
+  ],
+  "notes": "This work was supported by the U.S. National Science Foundation under awards OAC-2608825 and 2534344.",
+  "version": "v2026.10"
+}
