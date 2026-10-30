@@ -55,7 +55,7 @@ class TestSearchPapers(_FixtureCase):
     def test_search_papers(self):
         """Filters by system, role, element, year and evidence class return the expected papers, with paging and bad-input errors."""
         allp = self.fx.search_papers()
-        assert allp["total"] == len(json.loads((fixture / "bibliography/index.json").read_text())["rows"])
+        assert allp["total"] == len(json.loads((fixture / "bibliography/index.json").read_text(encoding="utf-8"))["rows"])
         tdb = self.fx.search_papers(system="Ti-Ni", role="tdb_source_assessment")
         assert tdb["total"] >= 10 and all("tdb_source_assessment" in p["roles"] for p in tdb["papers"])
         years = [p["year"] or 0 for p in tdb["papers"]]

@@ -15,7 +15,7 @@ class TestReleaseReview(TestCase):
     def test_release_review_and_identity_survive_summary(self):
         """Every human-reviewed correction, evidence identity and duplicate in the release survives the summary."""
         reviewed = identities = duplicates = 0
-        with gzip.open(data_dir / "literature/orchid-literature.jsonl.gz", "rt") as stream:
+        with gzip.open(data_dir / "literature/orchid-literature.jsonl.gz", "rt", encoding="utf-8") as stream:
             for line in stream:
                 record = json.loads(line)
                 corrections = [c for c in record.get("corrections", []) if c.get("rule") == "source_adjudicated_human_review"]

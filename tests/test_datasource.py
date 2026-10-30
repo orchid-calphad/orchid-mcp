@@ -37,7 +37,7 @@ class TestDataSource(TestCase):
     def test_local_and_traversal(self):
         """Local JSON files are read and existence-checked, while traversal outside the root is refused."""
         (self.tmp_path / "a").mkdir()
-        (self.tmp_path / "a" / "x.json").write_text('{"k": 1}')
+        (self.tmp_path / "a" / "x.json").write_text('{"k": 1}', encoding="utf-8")
         ds = DataSource(self.tmp_path)
         assert ds.read_json("a/x.json") == {"k": 1}
         assert ds.exists("a/x.json") and not ds.exists("a/y.json")
