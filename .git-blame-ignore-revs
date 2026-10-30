@@ -1,0 +1,13 @@
+# Mechanical refactor commits (moves, renames, formatting, autofixes). Use: git config blame.ignoreRevsFile .git-blame-ignore-revs
+# Add ruff configuration (style guide section 1)
+11c217e61bf244ba8e6bef17c828b1454ec1353f
+# Split tools.py into per-domain modules behind a thin Orchid facade
+85079292ba08d22fb62e07a3ac77cb842527f002
+# Style pass over the package: docstrings, lowercase module constants, lint
+168bcc8bbf27372ea34979f3cb71f87bb5977660
+# Restyle tests as TestCase classes with one-line docstrings
+a86d1f53adcaf8e2213bae360f19b3b700b79ca3
+# Move the built-in stdio fallback out of server.py into stdio.py
+782b7a70e491bb3b4c80acea9db2f2efd32fe292
+# Drop decorative section banners and audit-history tags from comments
+7b56d8686c73609e2a331e063404c3ac55e8ff1e
