@@ -42,3 +42,26 @@ def test_remote_fetch_and_cache(tmp_path, monkeypatch):
     assert len(calls) == 1
     with pytest.raises(NotFound):
         ds2.read_bytes("literature/other.json")
+
+
+
+def test_read_json_wraps_undecodable_bytes(tmp_path):
+    """BL-016: a file that is not valid UTF-8 raises DataSourceError, not UnicodeDecodeError."""
+    (tmp_path / "bad.json").write_bytes(b"\xff\xfe\x00not utf-8 \x80")
+    with pytest.raises(DataSourceError):
+        DataSource(tmp_path).read_json("bad.json")
+
+
+def test_read_json_wraps_recursion_error(tmp_path, monkeypatch):
+    """BL-016: a document nested past the parser's limit raises DataSourceError, not RecursionError.
+
+    Whether real deep nesting overflows depends on the Python version, so the parser error is simulated."""
+    import orchid_mcp.datasource as dsmod
+
+    def too_deep(*_a, **_k):
+        raise RecursionError("maximum recursion depth exceeded")
+
+    (tmp_path / "deep.json").write_text("[[]]")
+    monkeypatch.setattr(dsmod.json, "loads", too_deep)
+    with pytest.raises(DataSourceError):
+        DataSource(tmp_path).read_json("deep.json")

@@ -140,8 +140,10 @@ class DataSource:
         if path not in self._json:
             try:
                 self._json[path] = json.loads(self.read_bytes(path))
-            except json.JSONDecodeError as exc:
+            except (json.JSONDecodeError, UnicodeDecodeError) as exc:
                 raise DataSourceError(f"invalid JSON in {path}: {exc}") from exc
+            except RecursionError as exc:  # pathologically nested document
+                raise DataSourceError(f"JSON nested too deeply in {path}") from exc
         return self._json[path]
 
 

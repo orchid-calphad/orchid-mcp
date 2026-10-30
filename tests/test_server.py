@@ -66,3 +66,32 @@ def test_stdio_smoke(server_env, fallback, orchid):
     finally:
         proc.stdin.close()
         proc.wait(timeout=10)
+
+
+@pytest.mark.parametrize(
+    "method,params",
+    [
+        ("tools/call", ["not", "an", "object"]),
+        ("tools/call", {"name": ["not-a-string"]}),
+        ("tools/call", {"name": "search_systems", "arguments": ["not", "an", "object"]}),
+        ("resources/read", {"uri": ["unhashable"]}),
+        ("resources/read", "orchid://not-an-object"),
+        ("prompts/get", {"name": {"not": "a string"}}),
+        ("prompts/get", {"name": "cite_orchid", "arguments": "not an object"}),
+    ],
+)
+def test_malformed_params_are_invalid_params(method, params):
+    """BL-017: malformed params give -32602 (invalid params), not -32603 (internal error)."""
+    resp = server.handle_request({"jsonrpc": "2.0", "id": 7, "method": method, "params": params})
+    assert resp["id"] == 7 and resp["error"]["code"] == -32602
+
+
+def test_fallback_stdio_survives_non_object_messages():
+    """A JSON line that is not an object (e.g. an array) gets -32600 and the server keeps running."""
+    import io
+
+    out = io.StringIO()
+    server.run_fallback_stdio(io.StringIO('[1, 2]\n{"jsonrpc": "2.0", "id": 1, "method": "ping"}\n'), out)
+    lines = [json.loads(x) for x in out.getvalue().splitlines()]
+    assert lines[0]["error"]["code"] == -32600 and lines[0]["id"] is None
+    assert lines[1] == {"jsonrpc": "2.0", "id": 1, "result": {}}
