@@ -416,7 +416,7 @@ def handle_request(msg: dict[str, Any]) -> dict[str, Any] | None:
     """Handle one JSON-RPC message of the MCP protocol (fallback server)."""
     mid = msg.get("id")
     method = msg.get("method", "")
-    params = msg.get("params") or {}
+    params = msg.get("params")
     if mid is None:  # notification
         return None
 
@@ -425,6 +425,20 @@ def handle_request(msg: dict[str, Any]) -> dict[str, Any] | None:
 
     def err(code: int, message: str) -> dict[str, Any]:
         return {"jsonrpc": "2.0", "id": mid, "error": {"code": code, "message": message}}
+
+    # Malformed params are the client's error (-32602 invalid params), not an internal one.
+    if params is None:
+        params = {}
+    elif not isinstance(params, dict):
+        return err(-32602, "params must be an object")
+    name, arguments = params.get("name"), params.get("arguments")
+    if method in ("tools/call", "prompts/get"):
+        if not isinstance(name, str):
+            return err(-32602, "params.name must be a string")
+        if arguments is not None and not isinstance(arguments, dict):
+            return err(-32602, "params.arguments must be an object")
+    if method == "resources/read" and not isinstance(params.get("uri"), str):
+        return err(-32602, "params.uri must be a string")
 
     if method == "initialize":
         return ok(
@@ -500,6 +514,11 @@ def run_fallback_stdio(stdin: Any = None, stdout: Any = None) -> None:
         except json.JSONDecodeError:
             resp: dict[str, Any] | None = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}}
         else:
+            if not isinstance(msg, dict):  # e.g. a JSON array: invalid request, keep running
+                resp = {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "invalid request"}}
+                stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
+                stdout.flush()
+                continue
             try:
                 resp = handle_request(msg)
             except Exception as exc:  # keep the server alive
