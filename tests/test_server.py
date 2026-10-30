@@ -57,6 +57,8 @@ class TestToolSchemas(TestCase):
         assert tools["search_systems"]["inputSchema"]["properties"]["elements"]["anyOf"][0]["type"] == "array"
         fields = tools["get_system_data"]["inputSchema"]["properties"]["fields"]
         assert fields["enum"] == ["summary", "full"] and fields["default"] == "summary"
+        source = tools["get_invariant_reactions"]["inputSchema"]["properties"]["source"]
+        assert source["enum"] == ["literature", "calculated", "both"] and source["default"] == "both"
         assert tools["get_system_data"]["inputSchema"]["properties"]["limit"]["default"] == 50
         assert tools["get_phase"]["inputSchema"]["required"] == ["system", "phase"]
         assert tools["search_phases"]["inputSchema"]["properties"]["limit"]["default"] == 50

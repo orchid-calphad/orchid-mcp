@@ -35,6 +35,7 @@ server_instructions = (
 )
 
 Fields = Literal["summary", "full"]
+Sources = Literal["literature", "calculated", "both"]
 
 _ORCHID: Orchid | None = None
 
@@ -109,7 +110,7 @@ def get_system_data(
 
 def get_invariant_reactions(
     system: str,
-    source: str = "both",
+    source: Sources = "both",
     assessment: str | None = None,
     accepted_only: bool = True,
     limit: int = 50,
