@@ -23,6 +23,7 @@ from .server import (
 )
 
 protocol_version = "2025-06-18"
+_tools_by_name = {fn.__name__: fn for fn in tool_functions}
 
 
 def _ok(mid: Any, result: Any) -> dict[str, Any]:
@@ -111,8 +112,7 @@ def _rpc_tools_call(mid: Any, params: dict[str, Any]) -> dict[str, Any]:
     Returns:
         The response object; tool errors and bad arguments come back with ``isError`` set.
     """
-    by_name = {fn.__name__: fn for fn in tool_functions}
-    fn = by_name.get(params.get("name"))
+    fn = _tools_by_name.get(params.get("name"))
     if fn is None:
         return _err(mid, -32602, f"unknown tool {params.get('name')!r}")
     args = params.get("arguments") or {}
