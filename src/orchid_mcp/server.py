@@ -12,6 +12,7 @@ import argparse
 import functools
 import inspect
 import json
+import re
 import sys
 import types
 import typing
@@ -388,6 +389,56 @@ def tool_descriptions() -> list[dict[str, Any]]:
     ]
 
 
+verification_levels: dict[str, str] = {
+    # golden: a committed fixture test asserts specific values; smoke: only tests/test_smoke.py checks the response shape
+    "search_systems": "smoke",
+    "get_system_data": "golden",
+    "get_invariant_reactions": "golden",
+    "get_formation_enthalpy": "smoke",
+    "get_phase_diagram": "golden",
+    "list_tdb_files": "smoke",
+    "get_tdb": "golden",
+    "get_paper": "golden",
+    "search_papers": "golden",
+    "get_paper_relations": "golden",
+    "get_assessment_evidence": "golden",
+    "compare_to_dft": "golden",
+    "get_phase": "golden",
+    "search_phases": "golden",
+    "get_structure_type": "golden",
+}
+
+
+def tools_manifest() -> dict[str, Any]:
+    """Machine-readable manifest of the tools: name, first summary line, parameters, required names and verification level.
+
+    Returns:
+        A dict with a ``tools`` list, one entry per tool in ``tool_functions`` order.
+    """
+    return {
+        "server": server_name,
+        "tools": [
+            {
+                "name": tool["name"],
+                "summary": " ".join(re.split(r"(?<=[.!?])\s+(?=[A-Z])", tool["description"], maxsplit=1)[0].split()),
+                "parameters": tool["inputSchema"]["properties"],
+                "required": tool["inputSchema"]["required"],
+                "verification_level": verification_levels[tool["name"]],
+            }
+            for tool in tool_descriptions()
+        ],
+    }
+
+
+def render_tools_manifest() -> str:
+    """The tool manifest as the JSON text stored in ``openapi/tools_manifest.json``.
+
+    Returns:
+        Indented JSON with a trailing newline.
+    """
+    return json.dumps(tools_manifest(), indent=2, ensure_ascii=False) + "\n"
+
+
 def _sdk_server_class() -> tuple[Any, int]:
     """The official SDK's high-level server class and its major API generation.
 
@@ -491,8 +542,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--host", default="127.0.0.1", help="HTTP bind address (default 127.0.0.1)")
     ap.add_argument("--port", type=int, default=8000, help="HTTP port (default 8000)")
     ap.add_argument("--fallback", action="store_true", help="use the built-in stdio server even if `mcp` is installed")
+    ap.add_argument("--list-tools", action="store_true", help="print the tool manifest (openapi/tools_manifest.json) and exit")
     ap.add_argument("--version", action="version", version=f"orchid-mcp {__version__}")
     args = ap.parse_args(argv)
+    if args.list_tools:
+        print(render_tools_manifest(), end="")
+        return 0
     if args.transport == "http":
         if not sdk_available():
             print("streamable HTTP needs the MCP SDK: pip install mcp", file=sys.stderr)
