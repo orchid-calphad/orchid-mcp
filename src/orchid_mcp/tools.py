@@ -87,7 +87,6 @@ class Orchid:
         """
         return self._core.resource_text(name)
 
-    # ------------------------------------------------------------- systems
     def search_systems(  # noqa: PLR0917 (public signature kept)
         self,
         elements: list[str] | None = None,
@@ -152,7 +151,6 @@ class Orchid:
             fields=fields,
         )
 
-    # --------------------------------------------------------- diagrams, DFT
     def get_phase_diagram(  # noqa: PLR0917, N803 (public parameter names kept)
         self,
         system: str,
@@ -247,7 +245,6 @@ class Orchid:
         """
         return self._dft.compare_to_dft(system=system, default_subset_only=default_subset_only, fields=fields)
 
-    # ------------------------------------------------------------ TDB files
     def list_tdb_files(  # noqa: PLR0917 (public signature kept)
         self,
         elements: list[str] | None = None,
@@ -290,7 +287,6 @@ class Orchid:
         """
         return self._tdb.get_tdb(file=file, include_content=include_content, max_bytes=max_bytes)
 
-    # ------------------------------------------------------- papers, biblio
     def get_paper(self, doi: str, fields: str = "summary") -> dict[str, Any]:
         """Bibliographic record of a paper (by DOI or ORCHID id), its systems, values and contexts.
 
@@ -375,7 +371,6 @@ class Orchid:
         """
         return self._bibliography.get_assessment_evidence(system=system, max_data_papers=max_data_papers)
 
-    # ------------------------------------------------------------ phases
     def get_phase(self, system: str, phase: str, fields: str = "summary") -> dict[str, Any]:
         """One phase of a binary system from the ORCHID phase registry.
 

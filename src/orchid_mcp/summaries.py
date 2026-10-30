@@ -162,7 +162,7 @@ def ml_folds(r: dict[str, Any]) -> dict[str, Any]:
         "fold_lpo": r["fold_lpo"] if r.get("fold_lpo") is not None else ml_fold(pid),
     }
     if r.get("source_system") and r.get("source_system") != cs:
-        # since audit round 2 (A1 C4) the system is that of the record's own state; the paper's system is kept
+        # the system is that of the record's own state; the paper's system is kept
         out["source_system"] = r["source_system"]
     return out
 

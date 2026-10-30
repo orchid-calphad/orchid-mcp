@@ -94,7 +94,6 @@ class OrchidCore:
         self.site = site
         self._systems: dict[str, dict[str, Any]] = {}
 
-    # ------------------------------------------------------------------ indexes
     def lit_index(self) -> dict[str, Any]:
         """Literature index of the release (``literature/index.json``).
 
@@ -119,7 +118,6 @@ class OrchidCore:
         """
         return self.data.read_json("literature/papers.json")
 
-    # ----------------------------------------------------------------- envelope
     def meta(self) -> dict[str, Any]:
         """Dataset description, release, licence, citation text and notes attached to every response.
 
@@ -176,7 +174,6 @@ class OrchidCore:
         except ChemError as exc:
             raise OrchidError(str(exc)) from exc
 
-    # ------------------------------------------------------------- literature
     def system_doc(self, sys_id: str) -> dict[str, Any] | None:
         """Merged literature document of one chemical system, cached for the life of the instance.
 
@@ -291,7 +288,6 @@ class OrchidCore:
         """
         return bool((rec.get("flags") or {}).get("extraction_accepted"))
 
-    # ---------------------------------------------------------- resources
     def resource_text(self, name: str) -> str:
         """Text of a documentation resource (schema, dataset card, licence) with a comment line per file.
 
