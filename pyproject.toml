@@ -29,3 +29,15 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 130
+force-exclude = true
+
+[tool.ruff.lint]
+select = ["A", "B", "C4", "D", "E", "ERA", "F", "FA", "I", "ICN", "N", "PL", "PTH", "Q", "SIM", "TC", "UP", "W"]
+ignore = ["E501", "PLR0913", "PLR2004"]  # long lines and magic-value comparisons are judgment calls, not lint failures
+pydocstyle.convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
