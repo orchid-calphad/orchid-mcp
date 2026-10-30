@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import posixpath
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -126,10 +127,7 @@ class DataSource:
             if cached.is_file():
                 return cached.read_bytes()
             raise DataSourceError(f"cannot fetch {url}: {exc}") from exc
-        cached.parent.mkdir(parents=True, exist_ok=True)
-        tmp = cached.with_suffix(cached.suffix + ".tmp")
-        tmp.write_bytes(data)
-        tmp.replace(cached)
+        _store(cached, data)
         return data
 
     def read_text(self, path: str) -> str:
@@ -145,6 +143,34 @@ class DataSource:
             except RecursionError as exc:  # pathologically nested document
                 raise DataSourceError(f"JSON nested too deeply in {path}") from exc
         return self._json[path]
+
+
+def _store(cached: Path, data: bytes, attempts: int = 5) -> None:
+    """Write a cache file atomically and best-effort.
+
+    Each writer uses its own temporary file, so concurrent processes never share one (BL-004). A rename that fails
+    for a moment (on Windows, while another process has the target open) is retried; if the cache still cannot be
+    written, the data already fetched is kept and only the caching is skipped."""
+    tmp = None
+    try:
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        fd, name = tempfile.mkstemp(dir=cached.parent, prefix=cached.name + ".", suffix=".tmp")
+        tmp = Path(name)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        for i in range(attempts):
+            try:
+                tmp.replace(cached)
+                return
+            except PermissionError:
+                if i == attempts - 1:
+                    raise
+                time.sleep(0.05 * (i + 1))
+    except OSError:
+        pass
+    finally:
+        if tmp is not None and tmp.exists():
+            tmp.unlink(missing_ok=True)
 
 
 def sources_from_env() -> tuple[DataSource, DataSource]:
