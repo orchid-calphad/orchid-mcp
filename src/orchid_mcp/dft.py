@@ -153,8 +153,7 @@ def _in_default(rec: dict[str, Any], pts: list[dict[str, Any]]) -> Any:
         and not rec.get("unsigned")
         and not rec.get("sign_lost")
         and not rec.get("suspect")
-        # per-point default of build_dft_parity (structure match, composition offset, 0 K experimental;
-        # ORCHID audit round 2, A4 E1/E5/E6): a record counts when at least one of its points is default
+        # a record counts when at least one of its points is default (structure match, composition offset, 0 K experimental)
         and any(p.get("default", True) for p in pts)
     )
 
@@ -221,7 +220,6 @@ class DftTools:
         self._core = core
         self._parity_by_sys: dict[str, list[str]] | None = None
 
-    # ----------------------------------------------------------------- layers
     def _hull(self, layer: str, sid: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         """Hull document and entries document of a binary system in one DFT layer.
 
@@ -294,7 +292,6 @@ class DftTools:
         """
         return {layer: self._layer_at(layer, sid, comp) for layer in dft_layers}
 
-    # -------------------------------------------------------- formation tool
     def get_formation_enthalpy(
         self, *, formula: str, accepted_only: bool, include_higher_order_systems: bool, fields: str
     ) -> dict[str, Any]:
@@ -410,7 +407,6 @@ class DftTools:
                 summary[f"literature_{ev}"] = stats(vals)
         return summary
 
-    # ------------------------------------------------------- DFT comparison
     def _parity(self) -> dict[str, Any]:
         """The literature-versus-DFT parity table (``literature/dft_parity.json``).
 

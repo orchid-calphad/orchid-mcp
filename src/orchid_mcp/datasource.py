@@ -94,13 +94,11 @@ class DataSource:
         self.offline = offline
         self._json: dict[str, Any] = {}
 
-    # -- description -------------------------------------------------------
     @property
     def location(self) -> str:
         """Where the files come from: the local directory, or the base URL."""
         return str(self.local_dir) if self.local_dir else self.base_url
 
-    # -- raw access --------------------------------------------------------
     def _cache_file(self, path: str) -> Path:
         """Cache location of a remote file, keyed by a hash of the base URL.
 

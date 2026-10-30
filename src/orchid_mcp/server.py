@@ -58,7 +58,6 @@ def _call(fn: Callable[..., dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
         return {"error": str(exc)}
 
 
-# ---------------------------------------------------------------- tools
 def search_systems(
     elements: list[str] | None = None,
     text: str | None = None,
@@ -340,7 +339,6 @@ resource_table = {
 }
 
 
-# ------------------------------------------------------------ JSON schema
 def _schema_for(tp: Any) -> dict[str, Any]:
     origin = typing.get_origin(tp)
     args = typing.get_args(tp)
@@ -389,7 +387,6 @@ def tool_descriptions() -> list[dict[str, Any]]:
     ]
 
 
-# ------------------------------------------------------- official SDK path
 def _sdk_server_class() -> tuple[Any, int]:
     """The official SDK's high-level server class and its major API generation.
 
