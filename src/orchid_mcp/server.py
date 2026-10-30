@@ -669,15 +669,18 @@ _rpc_handlers: dict[str, Any] = {
 }
 
 
-def handle_request(msg: dict[str, Any]) -> dict[str, Any] | None:
+def handle_request(msg: Any) -> dict[str, Any] | None:
     """Handle one JSON-RPC message of the MCP protocol (fallback server).
 
     Args:
-        msg (dict[str, Any]): Decoded request. A message without an ``id`` is a notification.
+        msg (Any): Decoded JSON value. A message without an ``id`` is a notification; a value that is not an
+            object is an invalid request (-32600).
 
     Returns:
         The response object, or None for a notification.
     """
+    if not isinstance(msg, dict):
+        return _err(None, -32600, "invalid request")
     mid = msg.get("id")
     method = msg.get("method", "")
     params = msg.get("params") or {}

@@ -100,19 +100,6 @@ class DataSource:
         """Where the files come from: the local directory, or the base URL."""
         return str(self.local_dir) if self.local_dir else self.base_url
 
-    def public_url(self, path: str, public_base: str | None = None) -> str:
-        """Public URL of a file.
-
-        Args:
-            path (str): Relative data path.
-            public_base (str | None): Base URL to use instead of ``base_url``.
-
-        Returns:
-            The URL of the file.
-        """
-        base = public_base or self.base_url
-        return (base if base.endswith("/") else base + "/") + _clean_path(path)
-
     # -- raw access --------------------------------------------------------
     def _cache_file(self, path: str) -> Path:
         """Cache location of a remote file, keyed by a hash of the base URL.
