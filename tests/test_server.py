@@ -1,5 +1,6 @@
 """MCP server surface: tool schemas, plus a stdio smoke test that drives a real server subprocess over JSON-RPC."""
 
+import io
 import json
 import subprocess
 import sys
@@ -63,6 +64,21 @@ class TestToolSchemas(TestCase):
         assert tools["get_paper_relations"]["inputSchema"]["properties"]["direction"]["default"] == "both"
         assert tools["get_assessment_evidence"]["inputSchema"]["required"] == ["system"]
         assert tools["get_paper"]["inputSchema"]["properties"]["fields"]["default"] == "summary"
+
+
+class TestFallbackProtocol(TestCase):
+    """The built-in JSON-RPC fallback answers invalid input without dying."""
+
+    def test_non_object_json_gets_invalid_request_and_server_lives(self):
+        """A JSON number or array is answered with -32600, and the next valid request still gets a reply."""
+        requests = '123\n[1]\n{"jsonrpc": "2.0", "id": 7, "method": "ping"}\n'
+        stdin, stdout = io.StringIO(requests), io.StringIO()
+        server.run_fallback_stdio(stdin, stdout)
+        replies = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        assert [r["id"] for r in replies] == [None, None, 7]
+        assert replies[0]["error"]["code"] == -32600
+        assert replies[1]["error"]["code"] == -32600
+        assert replies[2]["result"] == {}
 
 
 class TestStdioSmoke(OrchidTestCase):
