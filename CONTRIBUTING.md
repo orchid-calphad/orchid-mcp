@@ -16,7 +16,14 @@ Thank you for helping. This repository is the MCP server and the OpenAPI descrip
 
 ```bash
 .venv/bin/pip install -e '.[mcp,test]'
-ORCHID_TEST_DATA_DIR=~/projects/orchid-data ORCHID_TEST_SITE_DATA_DIR=~/projects/orchid-project.org/data .venv/bin/python -m pytest
+ORCHID_TEST_DATA_DIR=/path/to/orchid-data ORCHID_TEST_SITE_DATA_DIR=/path/to/orchid-project.org/data .venv/bin/python -m pytest
+```
+
+The checks CI runs (pinned ruff, same as `.github/workflows/tests.yml`):
+
+```bash
+.venv/bin/pip install "ruff==0.16.8"
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
 ```
 
   On Windows use `.venv\Scripts\python` and clone the data repositories with `git clone -c core.autocrlf=false`:
