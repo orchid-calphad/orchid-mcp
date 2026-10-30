@@ -8,7 +8,7 @@ from unittest import TestCase
 
 from conftest import OrchidTestCase, server_env
 
-from orchid_mcp import server
+from orchid_mcp import server, stdio
 
 expected = {
     "search_systems",
@@ -73,7 +73,7 @@ class TestFallbackProtocol(TestCase):
         """A JSON number or array is answered with -32600, and the next valid request still gets a reply."""
         requests = '123\n[1]\n{"jsonrpc": "2.0", "id": 7, "method": "ping"}\n'
         stdin, stdout = io.StringIO(requests), io.StringIO()
-        server.run_fallback_stdio(stdin, stdout)
+        stdio.run_fallback_stdio(stdin, stdout)
         replies = [json.loads(line) for line in stdout.getvalue().splitlines()]
         assert [r["id"] for r in replies] == [None, None, 7]
         assert replies[0]["error"]["code"] == -32600
