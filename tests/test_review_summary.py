@@ -2,13 +2,18 @@
 import gzip
 import json
 
+import pytest
+
 from conftest import DATA_DIR
 from orchid_mcp.tools import summarize_record
 
 
 def test_release_review_and_identity_survive_summary():
+    release = DATA_DIR / "literature/orchid-literature.jsonl.gz"
+    if not release.is_file():
+        pytest.skip("local ORCHID data not found (set ORCHID_TEST_DATA_DIR)")
     reviewed = identities = duplicates = 0
-    with gzip.open(DATA_DIR / "literature/orchid-literature.jsonl.gz", "rt") as stream:
+    with gzip.open(release, "rt") as stream:
         for line in stream:
             record = json.loads(line)
             corrections = [c for c in record.get("corrections", [])

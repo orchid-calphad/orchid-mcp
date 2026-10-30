@@ -7,7 +7,15 @@ permissions:
   contents: read
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    # Linux, Windows and macOS (BL-005): GitHub's hosted runners are free for public repositories.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
