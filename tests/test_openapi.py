@@ -1,27 +1,43 @@
 """The static-API description parses as YAML, its $refs resolve, and its paths exist in the local data."""
 
+import hashlib
 import re
 from pathlib import Path
+from unittest import SkipTest, TestCase
 
-import pytest
+from conftest import data_dir, site_dir
 
-from conftest import DATA_DIR, SITE_DIR
-
-SPEC = Path(__file__).resolve().parents[1] / "openapi" / "openapi.yaml"
+spec = Path(__file__).resolve().parents[1] / "openapi" / "openapi.yaml"
 
 
 def _load():
-    text = SPEC.read_text(encoding="utf-8")
+    """Parse the OpenAPI document, running only a structural check when PyYAML is absent.
+
+    Returns:
+        The parsed OpenAPI document as a nested dict.
+
+    Raises:
+        SkipTest: If PyYAML is not installed, after the stdlib sanity check has passed.
+    """
+    text = spec.read_text(encoding="utf-8")
     assert "\t" not in text, "YAML must not contain tabs"
     try:
-        import yaml
+        import yaml  # noqa: PLC0415 - optional dependency, imported only when the document is parsed
     except ImportError:  # stdlib-only fallback: structural sanity check
         assert text.startswith("openapi: 3.1.0") and "\npaths:\n" in text and "\ncomponents:\n" in text
-        pytest.skip("PyYAML not installed; only the stdlib sanity check ran")
+        raise SkipTest("PyYAML not installed; only the stdlib sanity check ran") from None
     return yaml.safe_load(text)
 
 
 def _refs(node):
+    """Yield every ``$ref`` string found anywhere inside a nested dict or list.
+
+    Args:
+        node (dict | list | object): The parsed YAML node to search.
+
+    Yields:
+        Each ``$ref`` value, in document order.
+    """
     if isinstance(node, dict):
         for k, v in node.items():
             if k == "$ref":
@@ -33,51 +49,69 @@ def _refs(node):
             yield from _refs(v)
 
 
-def test_openapi_parses_and_refs_resolve():
-    spec = _load()
-    assert spec["openapi"].startswith("3.1")
-    for ref in set(_refs(spec)):
-        assert ref.startswith("#/")
-        node = spec
-        for part in ref[2:].split("/"):
-            node = node[part]
-    op_ids = [op["operationId"] for p in spec["paths"].values() for m, op in p.items() if m == "get"]
-    assert len(op_ids) == len(set(op_ids))
-    for path, item in spec["paths"].items():
-        assert set(item) <= {"get", "servers"}, f"{path} must be read-only"
-        names = set(re.findall(r"{(\w+)}", path))
-        declared = set()
-        for prm in item["get"].get("parameters", []):
-            if "$ref" in prm:
-                prm = spec["components"]["parameters"][prm["$ref"].rsplit("/", 1)[-1]]
-            declared.add(prm["name"])
-        assert names == declared, path
-
-
-EXAMPLES = {
-    "A": "AL", "B": "NI", "file": None, "layer": "dft-mp", "assessment": "AlNi-05Mie", "collection": "sgte-binary",
+examples = {
+    "A": "AL",
+    "B": "NI",
+    "file": None,
+    "layer": "dft-mp",
+    "assessment": "AlNi-05Mie",
+    "collection": "sgte-binary",
 }
 
 
 def _bib_example_file():
-    import hashlib
+    """Return the file name the static API uses for the example bibliography paper.
+
+    Returns:
+        ``p`` plus the first 16 hex digits of the sha256 of the example DOI, with a ``.json`` suffix.
+    """
     return "p" + hashlib.sha256(b"doi:10.1016/j.calphad.2005.02.002").hexdigest()[:16] + ".json"
 
 
-def test_documented_paths_exist_locally():
-    spec = _load()
-    if not DATA_DIR.is_dir() or not SITE_DIR.is_dir():
-        pytest.skip("local data not available")
-    for path, item in spec["paths"].items():
-        on_site = "servers" in item and "orchid-project.org/data" in item["servers"][0]["url"]
-        concrete = path
-        for name in re.findall(r"{(\w+)}", path):
-            val = EXAMPLES[name]
-            if name == "file":
-                val = {"/literature/systems/{file}": "AL-NI.json", "/phase-diagrams/sgte/{file}": "AlNi-05Mie.json",
-                       "/databases/{collection}/{file}": "AlNi-05Mie.tdb",
-                       "/phases/systems/{file}": "AL-NI.json", "/bibliography/systems/{file}": "AL-NI.json",
-                       "/bibliography/papers/{file}": _bib_example_file()}[path]
-            concrete = concrete.replace("{%s}" % name, val)
-        root = SITE_DIR if on_site else DATA_DIR
-        assert (root / concrete.lstrip("/")).is_file(), f"{path} -> {concrete} missing in {root}"
+class TestOpenApiSpec(TestCase):
+    """Tests for the structure and local-data consistency of the OpenAPI description."""
+
+    def test_openapi_parses_and_refs_resolve(self):
+        """The spec parses, every $ref resolves, operation ids are unique, and path parameters match declarations."""
+        doc = _load()
+        assert doc["openapi"].startswith("3.1")
+        for ref in set(_refs(doc)):
+            assert ref.startswith("#/")
+            node = doc
+            for part in ref[2:].split("/"):
+                node = node[part]
+        op_ids = [op["operationId"] for p in doc["paths"].values() for m, op in p.items() if m == "get"]
+        assert len(op_ids) == len(set(op_ids))
+        for path, item in doc["paths"].items():
+            assert set(item) <= {"get", "servers"}, f"{path} must be read-only"
+            names = set(re.findall(r"{(\w+)}", path))
+            declared = set()
+            for prm in item["get"].get("parameters", []):
+                resolved = prm
+                if "$ref" in prm:
+                    resolved = doc["components"]["parameters"][prm["$ref"].rsplit("/", 1)[-1]]
+                declared.add(resolved["name"])
+            assert names == declared, path
+
+    def test_documented_paths_exist_locally(self):
+        """Every documented path, with its example parameters filled in, is a real file in the local data."""
+        doc = _load()
+        if not data_dir.is_dir() or not site_dir.is_dir():
+            self.skipTest("local data not available")
+        for path, item in doc["paths"].items():
+            on_site = "servers" in item and "orchid-project.org/data" in item["servers"][0]["url"]
+            concrete = path
+            for name in re.findall(r"{(\w+)}", path):
+                val = examples[name]
+                if name == "file":
+                    val = {
+                        "/literature/systems/{file}": "AL-NI.json",
+                        "/phase-diagrams/sgte/{file}": "AlNi-05Mie.json",
+                        "/databases/{collection}/{file}": "AlNi-05Mie.tdb",
+                        "/phases/systems/{file}": "AL-NI.json",
+                        "/bibliography/systems/{file}": "AL-NI.json",
+                        "/bibliography/papers/{file}": _bib_example_file(),
+                    }[path]
+                concrete = concrete.replace(f"{{{name}}}", val)
+            base = site_dir if on_site else data_dir
+            assert (base / concrete.lstrip("/")).is_file(), f"{path} -> {concrete} missing in {base}"

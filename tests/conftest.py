@@ -1,41 +1,81 @@
+"""Shared pytest setup for the ORCHID test suite: paths, a network guard, and the local-data Orchid."""
+
+from __future__ import annotations
+
 import os
 import sys
 import urllib.request
+from functools import cache
 from pathlib import Path
+from typing import TYPE_CHECKING
+from unittest import TestCase
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+if TYPE_CHECKING:
+    from orchid_mcp.tools import Orchid
 
-DATA_DIR = Path(os.environ.get("ORCHID_TEST_DATA_DIR", Path.home() / "projects/orchid-data"))
-SITE_DIR = Path(os.environ.get("ORCHID_TEST_SITE_DATA_DIR", Path.home() / "projects/orchid-project.org/data"))
+root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root / "src"))
+
+data_dir = Path(os.environ.get("ORCHID_TEST_DATA_DIR", Path.home() / "projects/orchid-data"))
+site_dir = Path(os.environ.get("ORCHID_TEST_SITE_DATA_DIR", Path.home() / "projects/orchid-project.org/data"))
+
+local_data_skip_reason = "local ORCHID data not found (set ORCHID_TEST_DATA_DIR / ORCHID_TEST_SITE_DATA_DIR)"
 
 
 @pytest.fixture(autouse=True)
 def _no_network(monkeypatch):
+    """Make every test fail loudly if it tries to open a URL."""
+
     def refuse(*a, **k):  # tests must never touch the network
+        """Raise instead of performing a network request."""
         raise AssertionError("network access attempted during tests")
 
     monkeypatch.setattr(urllib.request, "urlopen", refuse)
 
 
-@pytest.fixture(scope="session")
-def orchid():
-    if not (DATA_DIR / "literature/index.json").is_file() or not (SITE_DIR / "catalog.json").is_file():
-        pytest.skip("local ORCHID data not found (set ORCHID_TEST_DATA_DIR / ORCHID_TEST_SITE_DATA_DIR)")
-    from orchid_mcp.datasource import DataSource
-    from orchid_mcp.tools import Orchid
+@cache
+def local_orchid() -> Orchid | None:
+    """Return the Orchid over the local data, or None when that data is absent.
 
-    return Orchid(DataSource(DATA_DIR), DataSource(SITE_DIR))
+    The result is cached for the whole test session, as the former session-scoped fixture was.
+
+    Returns:
+        An Orchid over ``data_dir`` and ``site_dir``, or None if either index file is missing.
+    """
+    if not (data_dir / "literature/index.json").is_file() or not (site_dir / "catalog.json").is_file():
+        return None
+    from orchid_mcp.datasource import DataSource  # noqa: PLC0415 - lazy: only needed once the data check passes
+    from orchid_mcp.tools import Orchid  # noqa: PLC0415 - lazy: same reason as the DataSource import above
+
+    return Orchid(DataSource(data_dir), DataSource(site_dir))
 
 
-@pytest.fixture()
-def server_env():
+class OrchidTestCase(TestCase):
+    """Base TestCase whose tests skip when local ORCHID data is absent and expose ``self.orchid``."""
+
+    orchid: Orchid
+
+    def setUp(self) -> None:
+        """Skip the test unless local ORCHID data is available, then attach the shared Orchid."""
+        super().setUp()
+        orchid = local_orchid()
+        if orchid is None:
+            self.skipTest(local_data_skip_reason)
+        self.orchid = orchid
+
+
+def server_env() -> dict[str, str]:
+    """Build the environment for a spawned ORCHID server that reads the local data offline.
+
+    Returns:
+        A copy of ``os.environ`` with the data directories, offline mode and ``src`` on ``PYTHONPATH`` set.
+    """
     return {
         **os.environ,
-        "ORCHID_DATA_DIR": str(DATA_DIR),
-        "ORCHID_SITE_DATA_DIR": str(SITE_DIR),
+        "ORCHID_DATA_DIR": str(data_dir),
+        "ORCHID_SITE_DATA_DIR": str(site_dir),
         "ORCHID_OFFLINE": "1",
-        "PYTHONPATH": str(ROOT / "src"),
+        "PYTHONPATH": str(root / "src"),
     }
