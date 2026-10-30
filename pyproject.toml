@@ -24,6 +24,9 @@ orchid-mcp = "orchid_mcp.server:main"
 Homepage = "https://orchid-project.org"
 Data = "https://data.orchid-project.org"
 
+[dependency-groups]
+dev = ["pytest==9.1.1", "pyyaml", "ruff==0.16.8"]  # the versions CI installs (.github/workflows/tests.yml)
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
