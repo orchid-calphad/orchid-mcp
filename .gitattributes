@@ -1,1 +1,4 @@
+# LF everywhere in the working tree so checksums, shell scripts and the generated manifest are identical on every OS
+* text=auto eol=lf
+# served TDB fixtures are hashed byte for byte: never touch their line endings
 tests/fixtures/orchid-synthetic/site/databases/**/*.tdb -text
