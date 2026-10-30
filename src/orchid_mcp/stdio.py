@@ -253,6 +253,9 @@ def run_fallback_stdio(stdin: Any = None, stdout: Any = None) -> None:
         stdin (Any): Text stream to read requests from (defaults to ``sys.stdin``).
         stdout (Any): Text stream to write responses to (defaults to ``sys.stdout``).
     """
+    if stdin is None and stdout is None:  # console streams: JSON-RPC is UTF-8 with bare LF (Windows default: cp1252, CRLF)
+        sys.stdin.reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8", newline="\n")
     stdin = stdin or sys.stdin
     stdout = stdout or sys.stdout
     for line in stdin:

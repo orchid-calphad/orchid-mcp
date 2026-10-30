@@ -82,6 +82,15 @@ class TestFallbackProtocol(TestCase):
         assert replies[1]["error"]["code"] == -32600
         assert replies[2]["result"] == {}
 
+    def test_console_streams_are_utf8_with_bare_lf(self):
+        """The real process answers in UTF-8 with LF-only lines, whatever the OS console defaults are."""
+        request = '{"jsonrpc": "2.0", "id": "éü", "method": "ping"}\n'.encode()
+        out = subprocess.run(
+            [sys.executable, "-m", "orchid_mcp", "--fallback"], input=request, capture_output=True, env=server_env(), check=True
+        ).stdout
+        assert b"\r" not in out and out.endswith(b"\n")
+        assert json.loads(out.decode("utf-8"))["id"] == "éü"
+
 
 class TestStdioSmoke(OrchidTestCase):
     """Tests that the stdio server answers the MCP handshake, tools, resources and prompts end to end."""
@@ -94,7 +103,13 @@ class TestStdioSmoke(OrchidTestCase):
         """
         cmd = [sys.executable, "-m", "orchid_mcp"] + (["--fallback"] if fallback else [])
         proc = subprocess.Popen(
-            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=server_env()
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            env=server_env(),
         )
         try:
             init = _rpc(
