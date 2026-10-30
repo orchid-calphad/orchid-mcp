@@ -1,0 +1,22 @@
+{
+ "release": "synthetic-ci-fixture-1",
+ "licence": {
+  "derived_data": "CC BY 4.0"
+ },
+ "systems": {
+  "AL-NI": {
+   "n": 3,
+   "accepted": 2,
+   "by_evidence_class": {
+    "experimental": 3
+   },
+   "by_property_group": {
+    "formation": 2,
+    "invariant reaction": 1
+   },
+   "files": [
+    "systems/AL-NI.json"
+   ]
+  }
+ }
+}

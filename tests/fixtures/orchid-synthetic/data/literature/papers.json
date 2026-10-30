@@ -1,0 +1,11 @@
+{
+ "doi:10.0000/synthetic-alni": {
+  "title": "Synthetic Al-Ni formation enthalpies (test fixture)",
+  "citation": "Synthetic A. (2001) Test Journal",
+  "doi": "10.0000/synthetic-alni",
+  "year": 2001,
+  "systems": [
+   "AL-NI"
+  ]
+ }
+}

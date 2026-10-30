@@ -1,0 +1,13 @@
+{
+ "above_hull": [
+  {
+   "x": 0.25,
+   "energy": -0.35,
+   "energy_above_hull_recomputed": 0.02,
+   "formula": "Al3Ni",
+   "phase": "x-9",
+   "spacegroup_symbol": "P1",
+   "theoretical": true
+  }
+ ]
+}
