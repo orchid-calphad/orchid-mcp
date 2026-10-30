@@ -430,7 +430,6 @@ def build_fastmcp(host: str = "127.0.0.1", port: int = 8000) -> Any:
         server = cls(server_name, instructions=server_instructions, version=__version__)
     else:
         server = cls(server_name, instructions=server_instructions, host=host, port=port)
-    server._orchid_http = {"host": host, "port": port, "gen": gen}
     for fn in tool_functions:
         server.tool(structured_output=False)(_raising(fn, gen))
     for uri, (key, desc, mime) in resource_table.items():
@@ -452,14 +451,14 @@ def build_fastmcp(host: str = "127.0.0.1", port: int = 8000) -> Any:
     return server
 
 
-def run_sdk(server: Any, transport: str) -> None:
-    """Run an SDK server on stdio or streamable HTTP (bound to the host/port given to build_fastmcp)."""
+def run_sdk(server: Any, transport: str, host: str = "127.0.0.1", port: int = 8000) -> None:
+    """Run an SDK server on stdio or streamable HTTP; host and port apply to HTTP only."""
     if transport == "stdio":
         server.run(transport="stdio")
         return
-    cfg = server._orchid_http
-    if cfg["gen"] >= 2:
-        server.run(transport="streamable-http", host=cfg["host"], port=cfg["port"])
+    _, gen = _sdk_server_class()
+    if gen >= 2:
+        server.run(transport="streamable-http", host=host, port=port)
     else:
         server.run(transport="streamable-http")
 
@@ -497,7 +496,7 @@ def main(argv: list[str] | None = None) -> int:
         if not sdk_available():
             print("streamable HTTP needs the MCP SDK: pip install mcp", file=sys.stderr)
             return 2
-        run_sdk(build_fastmcp(args.host, args.port), "http")
+        run_sdk(build_fastmcp(args.host, args.port), "http", args.host, args.port)
         return 0
     if sdk_available() and not args.fallback:
         run_sdk(build_fastmcp(), "stdio")
