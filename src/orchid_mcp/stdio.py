@@ -264,7 +264,7 @@ def run_fallback_stdio(stdin: Any = None, stdout: Any = None) -> None:
             continue
         try:
             msg = json.loads(text)
-        except (json.JSONDecodeError, RecursionError):  # nesting past the recursion limit is a parse error too
+        except (ValueError, RecursionError):  # JSONDecodeError, integers over the digit limit, nesting past the recursion limit
             resp: dict[str, Any] | None = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}}
         else:
             try:

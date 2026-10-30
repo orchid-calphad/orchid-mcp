@@ -70,3 +70,18 @@ class TestUnencodableEcho(TestCase):
         assert replies[0]["id"] == 1
         assert "\udc80" in replies[0]["result"]["messages"][0]["content"]["text"]
         assert replies[1] == {"jsonrpc": "2.0", "id": 2, "result": {}}
+
+
+class TestOversizedInteger(TestCase):
+    """An integer literal over the interpreter's digit limit must not end the server."""
+
+    def test_oversized_integer_gets_parse_error_and_next_request_is_answered(self):
+        """A 5,000-digit integer gets a parse error (id null); the next ping is still answered."""
+        stdin = io.StringIO('{"jsonrpc": "2.0", "id": 1, "params": {"n": ' + "9" * 5000 + "}}\n" + PING.decode("utf-8"))
+        stdout = io.StringIO()
+        run_fallback_stdio(stdin=stdin, stdout=stdout)
+        replies = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        assert replies == [
+            {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}},
+            {"jsonrpc": "2.0", "id": 2, "result": {}},
+        ]
