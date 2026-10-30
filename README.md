@@ -157,6 +157,9 @@ served (only their original-source links).
 `/phases/registry.json` (compact index), `/phases/systems/{SYS}.json` (full phase records),
 `/phases/structure_types.json` and, on `https://orchid-project.org/data`, `/catalog.json` and `/databases/{collection}/{file}`.
 
+`openapi/tools_manifest.json` lists every tool with its parameters and verification level (`smoke` or `golden`);
+regenerate it with `orchid-mcp --list-tools > openapi/tools_manifest.json` after changing a tool.
+
 ## Tests
 
 The data-dependent tests need two local checkouts, named by two environment variables that are set first:
