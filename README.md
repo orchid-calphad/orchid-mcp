@@ -41,18 +41,18 @@ orchid-mcp --transport http --port 8000      # streamable HTTP at http://127.0.0
 ### Claude Code
 
 ```bash
-# as installed on the Mac Studio: user scope, offline, from local checkouts, using the dedicated venv
+# user scope, offline, from local checkouts, using the dedicated venv (replace the placeholder paths)
 claude mcp add --scope user orchid \
-  -e ORCHID_DATA_DIR=$HOME/projects/orchid-data \
-  -e ORCHID_SITE_DATA_DIR=$HOME/projects/orchid-project.org/data \
-  -- $HOME/projects/orchid-mcp/.venv/bin/orchid-mcp
+  -e ORCHID_DATA_DIR=/path/to/orchid-data \
+  -e ORCHID_SITE_DATA_DIR=/path/to/orchid-project.org/data \
+  -- /path/to/orchid-mcp/.venv/bin/orchid-mcp
 
 # online (data fetched from data.orchid-project.org and cached)
 claude mcp add orchid -- orchid-mcp
 # offline, from local checkouts
 claude mcp add orchid \
-  -e ORCHID_DATA_DIR=$HOME/projects/orchid-data \
-  -e ORCHID_SITE_DATA_DIR=$HOME/projects/orchid-project.org/data \
+  -e ORCHID_DATA_DIR=/path/to/orchid-data \
+  -e ORCHID_SITE_DATA_DIR=/path/to/orchid-project.org/data \
   -- orchid-mcp
 # over HTTP (server started separately)
 claude mcp add --transport http orchid http://127.0.0.1:8000/mcp
@@ -68,8 +68,8 @@ Use the absolute path of `orchid-mcp` (e.g. `$(which orchid-mcp)`) if it is not 
     "orchid": {
       "command": "/absolute/path/to/orchid-mcp",
       "env": {
-        "ORCHID_DATA_DIR": "/Users/you/projects/orchid-data",
-        "ORCHID_SITE_DATA_DIR": "/Users/you/projects/orchid-project.org/data"
+        "ORCHID_DATA_DIR": "/path/to/orchid-data",
+        "ORCHID_SITE_DATA_DIR": "/path/to/orchid-project.org/data"
       }
     }
   }
@@ -159,9 +159,13 @@ served (only their original-source links).
 
 ## Tests
 
+The data-dependent tests need two local checkouts, named by two environment variables that are set first:
+`ORCHID_TEST_DATA_DIR` (an `orchid-data` checkout) and `ORCHID_TEST_SITE_DATA_DIR` (the `orchid-project.org/data`
+folder). Without them those tests are skipped.
+
 ```bash
 .venv/bin/pip install -e '.[mcp,test]'
-ORCHID_TEST_DATA_DIR=~/projects/orchid-data ORCHID_TEST_SITE_DATA_DIR=~/projects/orchid-project.org/data .venv/bin/python -m pytest
+ORCHID_TEST_DATA_DIR=/path/to/orchid-data ORCHID_TEST_SITE_DATA_DIR=/path/to/orchid-project.org/data .venv/bin/python -m pytest
 ```
 
 Tests read local data only; network access fails the run. The stdio smoke test runs against both the built-in
