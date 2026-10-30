@@ -6,7 +6,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from .constants import evidence_classes, public_data_url
-from .core import check_fields, norm_doi, wanted_elements
+from .core import norm_doi, wanted_elements
 from .datasource import NotFound
 from .errors import OrchidError
 
@@ -73,8 +73,8 @@ def bib_summary_record(r: dict[str, Any]) -> dict[str, Any]:
     if "assessed_assemblage_records" in es:
         ev["assessed_assemblage_records"] = es["assessed_assemblage_records"]
     rd = {}
-    for role, d in (r.get("role_details") or {}).items():
-        d = dict(d)
+    for role, detail in (r.get("role_details") or {}).items():
+        d = dict(detail)
         if "tdb_files" in d:
             d["tdb_files"] = [{k: t.get(k) for k in ("file", "system", "sha256", "bundled")} for t in d["tdb_files"]]
         rd[role] = d
@@ -117,6 +117,7 @@ def bib_row(r: dict[str, Any]) -> dict[str, Any]:
 
 def _structural_match(
     r: dict[str, Any],
+    *,
     sid: str | None,
     want: set[str],
     role: str | None,
@@ -282,8 +283,9 @@ class BibliographyTools:
         limit: int,
         offset: int,
     ) -> dict[str, Any]:
-        """Papers of the bibliography filtered by exact system, elements, role, property code, evidence class,
-        year range and title/author/DOI text.
+        """Papers of the bibliography filtered by system, elements, role, property code, evidence class, year and text.
+
+        Matching is by exact system, element inclusion, role, property code, evidence class,
 
         Args:
             system (str | None): Exact system id as written by the user.
@@ -314,7 +316,7 @@ class BibliographyTools:
         rows = [
             r
             for r in self.bib_index()["_rows"]
-            if _structural_match(r, sid, want, role, prop, evidence_class)
+            if _structural_match(r, sid=sid, want=want, role=role, prop=prop, evidence_class=evidence_class)
             and _year_text_match(r, year_from, year_to, tq)
         ]
         rows.sort(key=lambda r: (r.get("year") or 0, r["id"]))
@@ -342,9 +344,7 @@ class BibliographyTools:
             }
         )
 
-    def get_paper_relations(
-        self, *, doi: str, relation: str | None, direction: str, limit: int, offset: int
-    ) -> dict[str, Any]:
+    def get_paper_relations(self, *, doi: str, relation: str | None, direction: str, limit: int, offset: int) -> dict[str, Any]:
         """Typed relations of one paper (edges with provenance).
 
         Args:

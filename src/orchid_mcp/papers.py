@@ -28,8 +28,9 @@ class PapersTools:
         self._bib = bibliography
 
     def get_paper(self, *, doi: str, fields: str) -> dict[str, Any]:
-        """Bibliographic record of a paper (by DOI or ORCHID paper id), its systems, values and contexts, and its
-        bibliography entry.
+        """Bibliographic record of a paper (by DOI or ORCHID paper id).
+
+        The record lists its systems, values and experimental contexts, and its bibliography entry.
 
         Args:
             doi (str): DOI, or an ORCHID id such as ``doi:...``, ``nodoi:...``, ``ref:...`` or a bibliography key.

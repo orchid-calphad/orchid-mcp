@@ -10,14 +10,13 @@ classes or across DFT sources.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .bibliography import BibliographyTools, bib_used_default
 from .constants import default_limit
 from .core import OrchidCore
-from .datasource import DataSource
-from .diagrams import DiagramsTools
 from .dft import DftTools
+from .diagrams import DiagramsTools
 from .errors import OrchidError
 from .papers import PapersTools
 from .phases import PhasesTools
@@ -25,6 +24,9 @@ from .prompts import cite_orchid_prompt
 from .summaries import ml_fold, ml_folds, summarize_budget, summarize_record
 from .systems import SystemsTools
 from .tdb import TdbTools, tdb_max_bytes
+
+if TYPE_CHECKING:
+    from .datasource import DataSource
 
 __all__ = [
     "Orchid",
@@ -108,9 +110,7 @@ class Orchid:
         Returns:
             A page of systems with counts and links.
         """
-        return self._systems.search_systems(
-            elements=elements, text=text, exact=exact, limit=limit, offset=offset, fields=fields
-        )
+        return self._systems.search_systems(elements=elements, text=text, exact=exact, limit=limit, offset=offset, fields=fields)
 
     def get_system_data(  # noqa: PLR0917 (public signature kept)
         self,
@@ -234,9 +234,7 @@ class Orchid:
             fields=fields,
         )
 
-    def compare_to_dft(
-        self, system: str, default_subset_only: bool = False, fields: str = "summary"
-    ) -> dict[str, Any]:
+    def compare_to_dft(self, system: str, default_subset_only: bool = False, fields: str = "summary") -> dict[str, Any]:
         """Literature formation enthalpies vs Materials Project vs OQMD for one system.
 
         Args:
@@ -272,12 +270,13 @@ class Orchid:
         Returns:
             A page of catalog entries and the tier legend.
         """
-        return self._tdb.list_tdb_files(
-            elements=elements, exact=exact, tier=tier, limit=limit, offset=offset, fields=fields
-        )
+        return self._tdb.list_tdb_files(elements=elements, exact=exact, tier=tier, limit=limit, offset=offset, fields=fields)
 
     def get_tdb(
-        self, file: str, include_content: bool = True, max_bytes: int = tdb_max_bytes  # noqa: A002 (public name)
+        self,
+        file: str,
+        include_content: bool = True,
+        max_bytes: int = tdb_max_bytes,  # noqa: A002 (public name)
     ) -> dict[str, Any]:
         """One TDB catalog entry; the file content only for bundled, confirmed-licence files.
 
@@ -362,9 +361,7 @@ class Orchid:
         Returns:
             A page of relations with counts by type.
         """
-        return self._bibliography.get_paper_relations(
-            doi=doi, relation=relation, direction=direction, limit=limit, offset=offset
-        )
+        return self._bibliography.get_paper_relations(doi=doi, relation=relation, direction=direction, limit=limit, offset=offset)
 
     def get_assessment_evidence(self, system: str, max_data_papers: int = bib_used_default) -> dict[str, Any]:
         """Assessments of an exact system with the original data papers each used, and reassessment links.

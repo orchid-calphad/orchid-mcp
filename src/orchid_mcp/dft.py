@@ -106,9 +106,7 @@ def comp_matches(rec: dict[str, Any], comp: dict[str, float], tol: float = comp_
         True when the record's composition matches.
     """
     parsed = {
-        tuple(sorted(c.items()))
-        for c in (parse_formula(p.get("label") or "") for p in rec.get("phases") or [])
-        if c is not None
+        tuple(sorted(c.items())) for c in (parse_formula(p.get("label") or "") for p in rec.get("phases") or []) if c is not None
     }
     if len(parsed) == 1:
         return _same_composition(dict(next(iter(parsed))), comp, tol)
@@ -281,7 +279,7 @@ class DftTools:
             "entries": hits,
             "lowest_kJ_per_mol_atom": hits[0]["formation_energy_kJ_per_mol_atom"] if hits else None,
             "window_note": "entries above the hull are kept only within the layer's above_hull_window_eV",
-            "data_url": f"{public_data_url}{info['dir']}/{sid.split('-')[0]}/{sid}.json",
+            "data_url": f"{public_data_url}{info['dir']}/{sid.split('-', maxsplit=1)[0]}/{sid}.json",
         }
 
     def _dft_at(self, sid: str, comp: dict[str, float]) -> dict[str, Any]:
@@ -470,7 +468,7 @@ class DftTools:
             key = rec.get("formula") or "?"
             c = compounds.setdefault(key, {"formula": key, "composition": rec.get("comp"), "literature": [], "dft": {}})
             pap = papers.get(rec.get("paper"), {}) or self._core.paper_info(rec.get("paper"))
-            c["literature"].append(self._literature_entry(rid, rec, pap, in_default, pts, sid))
+            c["literature"].append(self._literature_entry(rid, rec, pap, in_default=in_default, pts=pts, sid=sid))
             for p in pts:
                 c["dft"].setdefault(
                     p.get("src"),
@@ -507,6 +505,7 @@ class DftTools:
         rid: str,
         rec: dict[str, Any],
         pap: dict[str, Any],
+        *,
         in_default: Any,
         pts: list[dict[str, Any]],
         sid: str,

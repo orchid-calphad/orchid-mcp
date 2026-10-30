@@ -39,5 +39,8 @@ select = ["A", "B", "C4", "D", "E", "ERA", "F", "FA", "I", "ICN", "N", "PL", "PT
 ignore = ["E501", "PLR0913", "PLR2004"]  # long lines and magic-value comparisons are judgment calls, not lint failures
 pydocstyle.convention = "google"
 
+[tool.ruff.lint.per-file-ignores]
+"src/orchid_mcp/server.py" = ["D205", "PLR0917", "A002", "N803"]  # MCP tool functions: parameter names, positional order and docstrings are the advertised protocol schema and descriptions, so they stay as they are
+
 [tool.ruff.format]
 quote-style = "double"
