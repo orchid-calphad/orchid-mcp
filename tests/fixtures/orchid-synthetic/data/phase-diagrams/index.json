@@ -1,0 +1,16 @@
+{
+ "source": "synthetic SGTE-style collection",
+ "engine": "pycalphad",
+ "systems": {
+  "AL-NI": [
+   {
+    "file": "AlNi-05Mie.json",
+    "tdb": "AlNi-05Mie.tdb",
+    "sha256": "67139cc029a4f5e6c534589840317a0eeb592373ae894e127d0b52b690bd78d2",
+    "citation": "Synthetic Mie (2005)",
+    "doi": "10.0000/synthetic-mie05",
+    "system": "AL-NI"
+   }
+  ]
+ }
+}

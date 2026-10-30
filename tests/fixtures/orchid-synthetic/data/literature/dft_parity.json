@@ -1,0 +1,73 @@
+{
+ "records": {
+  "ORC-SYN00001": {
+   "comp": {
+    "AL": 0.25,
+    "NI": 0.75
+   },
+   "formula": "Al3Ni",
+   "lit": -35.2,
+   "ev": "experimental",
+   "acc": true,
+   "unsigned": false,
+   "sign_lost": false,
+   "suspect": false,
+   "paper": "doi:10.0000/synthetic-alni",
+   "phase": "Al3Ni",
+   "T": 298.15,
+   "method": "calorimetry",
+   "mcls": "calorimetry",
+   "page": null,
+   "table": "Table 1",
+   "quote": null,
+   "kind": "table",
+   "sys": "AL-NI",
+   "own": true,
+   "cited": [],
+   "match": "exact",
+   "match_note": "ok"
+  }
+ },
+ "points": [
+  {
+   "rid": "ORC-SYN00001",
+   "src": "mp",
+   "dft": -36.1,
+   "dft_eV": -0.374,
+   "res": -0.9,
+   "mid": "mp-1",
+   "sg": "Pm-3m",
+   "ehull": 0.0,
+   "npoly": 1,
+   "theoretical": false,
+   "default": true
+  },
+  {
+   "rid": "ORC-SYN00001",
+   "src": "oqmd",
+   "dft": -35.0,
+   "dft_eV": -0.363,
+   "res": 0.2,
+   "mid": "1234",
+   "sg": "Pm-3m",
+   "ehull": 2.5,
+   "npoly": 2,
+   "theoretical": true,
+   "default": false
+  }
+ ],
+ "papers": {
+  "doi:10.0000/synthetic-alni": {
+   "citation": "Synthetic A. (2001) Test Journal",
+   "doi": "10.0000/synthetic-alni"
+  }
+ },
+ "dft_sources": {
+  "mp": "Materials Project",
+  "oqmd": "OQMD"
+ },
+ "rules": [
+  "synthetic"
+ ],
+ "description": "synthetic parity fixture (not data)"
+}

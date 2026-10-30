@@ -1,0 +1,161 @@
+{
+ "system": "AL-NI",
+ "elements": [
+  "AL",
+  "NI"
+ ],
+ "licence": {
+  "derived_data": "CC BY 4.0"
+ },
+ "release": "synthetic-ci-fixture-1",
+ "artifacts": {
+  "tbl1": {
+   "artifact": "table",
+   "page": 4,
+   "caption": "Table 1 (synthetic) formation enthalpies"
+  }
+ },
+ "models": {
+  "m1": {
+   "tdb": "AlNi-05Mie.tdb",
+   "citation": "Synthetic Mie (2005)",
+   "doi": "10.0000/synthetic-mie05"
+  }
+ },
+ "papers": {
+  "doi:10.0000/synthetic-alni": {
+   "citation": "Synthetic A. (2001) Test Journal",
+   "doi": "10.0000/synthetic-alni",
+   "doi_url": "https://doi.org/10.0000/synthetic-alni",
+   "year": 2001
+  }
+ },
+ "contexts": {},
+ "records": [
+  {
+   "id": "ORC-SYN00001",
+   "system": "AL-NI",
+   "property": "HM_FORM",
+   "property_group": "formation",
+   "value": -35.2,
+   "unit": "kJ/mol-atom",
+   "temperature_K": 298.15,
+   "evidence_class": "experimental",
+   "flags": {
+    "extraction_accepted": true,
+    "espei_ready": true,
+    "espei_certified": false,
+    "calphad_check": "agrees",
+    "review_state": "reviewed",
+    "state_fully_specified": true
+   },
+   "paper": "doi:10.0000/synthetic-alni",
+   "quote": null,
+   "quote_page": null,
+   "locator": {
+    "ref": "tbl1",
+    "label": "Table 1",
+    "row": 2
+   },
+   "phases": [
+    {
+     "label": "Al3Ni",
+     "model_phase": "AL3NI"
+    }
+   ],
+   "model": "m1",
+   "uncertainty_budget": {
+    "quantities": {
+     "value": {
+      "unit": "kJ/mol-atom",
+      "sigma_printed": {
+       "value": 0.5
+      },
+      "sigma_reading": {
+       "value": 0.1
+      },
+      "sigma_composition": {
+       "value": 0.0
+      },
+      "sigma_scatter": null,
+      "sigma_conversion": {
+       "value": 0.0
+      },
+      "sigma_method": {
+       "value": 1.0,
+       "class": "calorimetry",
+       "basis": "synthetic"
+      },
+      "sigma_effective": 1.1
+     }
+    },
+    "sigma_rule": "max(...)",
+    "calibration": "synthetic-cal-1"
+   },
+   "observation_type": "value",
+   "property_code": "HM_FORM"
+  },
+  {
+   "id": "ORC-SYN00002",
+   "system": "AL-NI",
+   "property": "HM_FORM",
+   "property_group": "formation",
+   "value": -30.0,
+   "unit": "kJ/mol-atom",
+   "evidence_class": "experimental",
+   "flags": {
+    "extraction_accepted": false,
+    "espei_ready": true,
+    "espei_certified": false,
+    "calphad_check": "agrees",
+    "review_state": "reviewed",
+    "state_fully_specified": true
+   },
+   "paper": "doi:10.0000/synthetic-alni",
+   "quote": "Synthetic sentence: AlNi forms with -30.0 kJ/mol.",
+   "quote_page": 5,
+   "locator": {
+    "ref": "tbl1"
+   },
+   "phases": []
+  },
+  {
+   "id": "ORC-SYN00003",
+   "system": "AL-NI",
+   "property": "INVARIANT_TEMPERATURE",
+   "property_group": "invariant reaction",
+   "observation_type": "invariant_reaction",
+   "value": 1638.0,
+   "unit": "K",
+   "evidence_class": "experimental",
+   "flags": {
+    "extraction_accepted": true,
+    "espei_ready": true,
+    "espei_certified": false,
+    "calphad_check": "agrees",
+    "review_state": "reviewed",
+    "state_fully_specified": true
+   },
+   "paper": "doi:10.0000/synthetic-alni",
+   "quote": "Synthetic eutectic at 1638 K",
+   "quote_page": 8,
+   "locator": {
+    "ref": "tbl1"
+   },
+   "phases": [
+    {
+     "label": "LIQUID",
+     "model_phase": "LIQUID"
+    },
+    {
+     "label": "ALNI",
+     "model_phase": "ALNI"
+    }
+   ],
+   "reaction": {
+    "type": "eutectic",
+    "printed": "L -> A + B"
+   }
+  }
+ ]
+}

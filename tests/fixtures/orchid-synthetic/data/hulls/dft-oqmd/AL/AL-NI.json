@@ -1,0 +1,38 @@
+{
+ "x_element": "NI",
+ "reference": "oqmd synthetic reference",
+ "provenance": {
+  "oqmd_release": "synthetic"
+ },
+ "isotherms": [
+  {
+   "T": 0,
+   "vertices": [
+    {
+     "formula": "Al",
+     "x": 0.0,
+     "energy": 0.0,
+     "phase": "mp-134",
+     "spacegroup_symbol": "Fm-3m",
+     "theoretical": false
+    },
+    {
+     "formula": "Al3Ni",
+     "x": 0.25,
+     "energy": -0.374,
+     "phase": "mp-1",
+     "spacegroup_symbol": "Pm-3m",
+     "theoretical": false
+    },
+    {
+     "formula": "Ni",
+     "x": 1.0,
+     "energy": 0.0,
+     "phase": "mp-23",
+     "spacegroup_symbol": "Fm-3m",
+     "theoretical": false
+    }
+   ]
+  }
+ ]
+}
