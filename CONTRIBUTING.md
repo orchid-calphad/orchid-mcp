@@ -19,6 +19,9 @@ Thank you for helping. This repository is the MCP server and the OpenAPI descrip
 ORCHID_TEST_DATA_DIR=~/projects/orchid-data ORCHID_TEST_SITE_DATA_DIR=~/projects/orchid-project.org/data .venv/bin/python -m pytest
 ```
 
+  On Windows use `.venv\Scripts\python` and clone the data repositories with `git clone -c core.autocrlf=false`:
+  the served `.tdb` files are checksummed byte for byte, and CRLF conversion changes the hash.
+
   Without local data the data-dependent tests are skipped (CI runs the rest); tests must never use the network.
 
 ## Licence
