@@ -166,6 +166,11 @@ The data-dependent tests need two local checkouts, named by two environment vari
 `ORCHID_TEST_DATA_DIR` (an `orchid-data` checkout) and `ORCHID_TEST_SITE_DATA_DIR` (the `orchid-project.org/data`
 folder). Without them those tests are skipped.
 
+With [uv](https://docs.astral.sh/uv/): `uv sync --extra mcp` once, then
+`ORCHID_TEST_DATA_DIR=/path/to/orchid-data ORCHID_TEST_SITE_DATA_DIR=/path/to/orchid-project.org/data uv run pytest`.
+
+With pip:
+
 ```bash
 .venv/bin/pip install -e '.[mcp,test]'
 ORCHID_TEST_DATA_DIR=/path/to/orchid-data ORCHID_TEST_SITE_DATA_DIR=/path/to/orchid-project.org/data .venv/bin/python -m pytest
