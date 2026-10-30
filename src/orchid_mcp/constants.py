@@ -26,7 +26,7 @@ fields_note = (
     "Accepted extraction does not imply fitness for fitting. Respect espei_ready and specification_gaps; "
     "human-review corrections requiring downstream revalidation remain blocked. Count duplicate/alternate-unit "
     "representations once using their canonical identity, and keep related observations in the same evaluation split. "
-    "Source adjudication by Codex is not independent human re-review."
+    "AI-assisted adjudication is not independent human re-review."
 )
 
 cite_text = (
