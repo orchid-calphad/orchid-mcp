@@ -47,3 +47,26 @@ class TestDeeplyNestedJson(TestCase):
             {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}},
             {"jsonrpc": "2.0", "id": 2, "result": {}},
         ]
+
+
+class TestUnencodableEcho(TestCase):
+    """A reply that echoes a lone surrogate from the request must not end the server."""
+
+    def test_lone_surrogate_in_reply_is_escaped_and_next_request_is_answered(self):
+        """A prompt topic holding a lone surrogate is answered with the surrogate escaped; the next ping is still answered."""
+        request = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "prompts/get",
+            "params": {"name": "cite_orchid", "arguments": {"topic": "\udc80"}},
+        }
+        stdin = io.StringIO(json.dumps(request) + "\n" + PING.decode("utf-8"))
+        raw = io.BytesIO()
+        stdout = io.TextIOWrapper(raw, encoding="utf-8", newline="\n")
+        run_fallback_stdio(stdin=stdin, stdout=stdout)
+        stdout.flush()
+        replies = [json.loads(line) for line in raw.getvalue().decode("utf-8").splitlines()]
+        assert len(replies) == 2
+        assert replies[0]["id"] == 1
+        assert "\udc80" in replies[0]["result"]["messages"][0]["content"]["text"]
+        assert replies[1] == {"jsonrpc": "2.0", "id": 2, "result": {}}

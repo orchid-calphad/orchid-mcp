@@ -272,5 +272,8 @@ def run_fallback_stdio(stdin: Any = None, stdout: Any = None) -> None:
             except Exception as exc:  # keep the server alive
                 resp = {"jsonrpc": "2.0", "id": msg.get("id"), "error": {"code": -32603, "message": str(exc)}}
         if resp is not None:
-            stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
+            try:
+                stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
+            except UnicodeEncodeError:  # e.g. a lone surrogate echoed from the request: escape it instead
+                stdout.write(json.dumps(resp) + "\n")
             stdout.flush()
