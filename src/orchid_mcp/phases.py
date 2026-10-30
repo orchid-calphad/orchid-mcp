@@ -148,7 +148,7 @@ def _phase_model_summary(m: dict[str, Any]) -> dict[str, Any]:
     Returns:
         Model name, phase name, type code, sublattices, shortened PHASE and CONSTITUENT statements and website URL.
     """
-    v = ((m.get("tdb_definition") or {}).get("verbatim") or {})
+    v = (m.get("tdb_definition") or {}).get("verbatim") or {}
     return {
         "tdb": m.get("tdb"),
         "phase_name": m.get("phase_name"),
@@ -456,11 +456,7 @@ class PhasesTools:
         t = _tier_aliases.get(t.lower()) if t else None
         nq = (name or "").strip().lower()
         pq = struct_norm(prototype) if prototype else ""
-        rows = [
-            r
-            for r in self._phase_rows()
-            if _structural_match(r, want, t, status) and _text_match(r, nq, pq)
-        ]
+        rows = [r for r in self._phase_rows() if _structural_match(r, want, t, status) and _text_match(r, nq, pq)]
         rows.sort(key=lambda r: (r.get("system") or "", r.get("id") or ""))
         lim, off = max(1, min(int(limit), phases_page_max)), max(0, int(offset))
         page = rows[off : off + lim]

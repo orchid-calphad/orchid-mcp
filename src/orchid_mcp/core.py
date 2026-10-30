@@ -9,7 +9,7 @@ from .chem import ChemError, element, system_id
 from .constants import cite_text, field_modes
 from .datasource import DataSourceError, sources_from_env
 from .errors import OrchidError
-from .report import REPORT_NOTE, report_url_for
+from .report import report_note, report_url_for
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -141,7 +141,7 @@ class OrchidCore:
                 "prior, sigma_composition, sigma_scatter, sigma_conversion) and sigma_effective = max(sqrt(max("
                 "printed, reading, method)^2 + composition^2 + conversion^2), scatter), the recommended sigma; "
                 "printed values and printed uncertainties are unchanged (literature/UNCERTAINTY_CALIBRATION.md).",
-                REPORT_NOTE,
+                report_note,
                 "Quotes are short excerpts kept so that each value can be verified; they remain under the "
                 "publishers' copyright and are not relicensed; source papers are not redistributed.",
             ],

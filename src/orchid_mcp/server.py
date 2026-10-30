@@ -15,14 +15,17 @@ import json
 import sys
 import types
 import typing
-from typing import Any, Callable, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from . import __version__
 from .datasource import DataSourceError
 from .tools import Orchid, OrchidError, cite_orchid_prompt
 
-SERVER_NAME = "orchid"
-INSTRUCTIONS = (
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+server_name = "orchid"
+server_instructions = (
     "ORCHID: CALPHAD thermodynamic data with provenance. Literature values (experimental | model | dft | "
     "unspecified, never mixed), calculated binary phase diagrams tied to TDB files by SHA-256, Materials Project "
     "and OQMD formation energies, the TDB catalog, the phase registry (every name of each binary "
@@ -37,7 +40,12 @@ _ORCHID: Orchid | None = None
 
 
 def orchid() -> Orchid:
-    global _ORCHID
+    """Shared Orchid instance, created on first use from the environment.
+
+    Returns:
+        The instance.
+    """
+    global _ORCHID  # noqa: PLW0603 (module-level singleton)
     if _ORCHID is None:
         _ORCHID = Orchid()
     return _ORCHID
@@ -62,7 +70,8 @@ def search_systems(
     """Find chemical systems in ORCHID. elements: e.g. ["Al","Ni"] (systems containing all of them; exact=true for
     exactly them). text: matches system names and titles/citations of reporting papers. Returns per-system counts
     by evidence class and the calculated assessments; fields="full" adds property-group counts, assessment
-    citations/DOIs and viewer URLs. Paginate with offset; `total` is the number of matching systems."""
+    citations/DOIs and viewer URLs. Paginate with offset; `total` is the number of matching systems.
+    """
     return _call(orchid().search_systems, elements=elements, text=text, exact=exact, limit=limit, offset=offset, fields=fields)
 
 
@@ -83,7 +92,8 @@ def get_system_data(
     (experimental|model|dft|unspecified). Paginate with limit/offset (default 50); `total` counts all matches.
     fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, espei_ready, espei_certified, calphad_check, citation, DOI, page,
     quote <= 240 chars or table locator) or "full" (every field with expanded provenance: locator, origin, flags,
-    uncertainty, conditions, cited sources, model link; compact=true then drops pipeline bookkeeping)."""
+    uncertainty, conditions, cited sources, model link; compact=true then drops pipeline bookkeeping).
+    """
     return _call(
         orchid().get_system_data,
         system=system,
@@ -112,7 +122,8 @@ def get_invariant_reactions(
     invariants are matched against all literature records; the literature list is paged with limit/offset
     (literature_total counts all).
     fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, espei_ready, espei_certified, calphad_check, citation, DOI, page,
-    quote <= 240 chars or table locator) or "full" (complete provenance)."""
+    quote <= 240 chars or table locator) or "full" (complete provenance).
+    """
     return _call(
         orchid().get_invariant_reactions,
         system=system,
@@ -131,7 +142,8 @@ def get_formation_enthalpy(
     """Formation enthalpy of a compound (e.g. "Al3Ni"): literature values in kJ/mol-atom with provenance,
     Materials Project and OQMD DFT entries at that composition, and per-evidence-class / per-source summaries.
     fields: "summary" (default; id, property, value, unit, T, phases, evidence class, accepted, espei_ready, espei_certified, calphad_check, citation, DOI, page,
-    quote <= 240 chars or table locator) or "full" (complete provenance)."""
+    quote <= 240 chars or table locator) or "full" (complete provenance).
+    """
     return _call(
         orchid().get_formation_enthalpy,
         formula=formula,
@@ -147,7 +159,8 @@ def get_phase_diagram(
     """Calculated binary phase diagram(s): TDB file, SHA-256, assessment citation/DOI, phases, invariants, viewer
     URL. assessment: TDB name (e.g. "AlNi-05Mie") or DOI; omit for all. With x (mole fraction of the diagram's
     x_component) and T (K): the stable phases at the nearest stored grid node. fields="full" adds the per-region
-    boundary summary and grid metadata."""
+    boundary summary and grid metadata.
+    """
     return _call(orchid().get_phase_diagram, system=system, assessment=assessment, x=x, T=T, fields=fields)
 
 
@@ -161,13 +174,15 @@ def list_tdb_files(
 ) -> dict:
     """TDB catalog entries for systems containing all `elements` (exact=true: exactly them). tier: bundled |
     fetched | manual. Returns name, elements, tier, licence, licence status, source URL, SHA-256 and, for bundled
-    files, the ORCHID download URL; fields="full" returns the whole catalog entry. Paginate with offset."""
+    files, the ORCHID download URL; fields="full" returns the whole catalog entry. Paginate with offset.
+    """
     return _call(orchid().list_tdb_files, elements=elements, exact=exact, tier=tier, limit=limit, offset=offset, fields=fields)
 
 
 def get_tdb(file: str, include_content: bool = True) -> dict:
     """One TDB catalog entry (e.g. "AlNi-05Mie.tdb") with licence, SHA-256 and download URL. The file content is
-    returned only for bundled files with a confirmed redistributable licence; fetched/manual tiers are never served."""
+    returned only for bundled files with a confirmed redistributable licence; fetched/manual tiers are never served.
+    """
     return _call(orchid().get_tdb, file=file, include_content=include_content)
 
 
@@ -177,7 +192,8 @@ def get_paper(doi: str, fields: Fields = "summary") -> dict:
     and its ORCHID bibliography entry: roles (corpus_assessment_read, cited_original_source, tdb_source_assessment,
     handbook_diagram_source, discovery_lead, ...), evidence summary (values by evidence class / property group,
     tables, passages, ESPEI datasets, phase-registry phases), Crossref metadata, open-access licence from Crossref,
-    relation counts. fields="full" adds the complete bibliography record and every relation (edges with provenance)."""
+    relation counts. fields="full" adds the complete bibliography record and every relation (edges with provenance).
+    """
     return _call(orchid().get_paper, doi=doi, fields=fields)
 
 
@@ -198,10 +214,20 @@ def search_papers(
     tdb_source_assessment | tdb_compilation | handbook_diagram_source | discovery_lead | context_source |
     espei_reference. property: property code of values reported in / citing the paper (HM_FORM,
     INVARIANT_TEMPERATURE, ...). evidence_class: experimental | model | dft | unspecified. year_from / year_to;
-    text: substring of title, authors or DOI. Sorted by year, then id; paginate with offset (`total` counts all)."""
+    text: substring of title, authors or DOI. Sorted by year, then id; paginate with offset (`total` counts all).
+    """
     return _call(
-        orchid().search_papers, system=system, elements=elements, role=role, property=property,
-        evidence_class=evidence_class, year_from=year_from, year_to=year_to, text=text, limit=limit, offset=offset,
+        orchid().search_papers,
+        system=system,
+        elements=elements,
+        role=role,
+        property=property,
+        evidence_class=evidence_class,
+        year_from=year_from,
+        year_to=year_to,
+        text=text,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -214,7 +240,8 @@ def get_paper_relations(
     system that it cites) | handbook_reproduces (handbook diagram -> original evaluation) | cited_by_crossref
     (publisher-deposited Crossref reference lists). direction: out | in | both. Examples: which original papers did
     this assessment use -> relation="cites", direction="out"; which assessments used this paper ->
-    relation="used_in_assessment", direction="out"; reassessment chain -> relation="reassesses"."""
+    relation="used_in_assessment", direction="out"; reassessment chain -> relation="reassesses".
+    """
     return _call(orchid().get_paper_relations, doi=doi, relation=relation, direction=direction, limit=limit, offset=offset)
 
 
@@ -222,7 +249,8 @@ def get_assessment_evidence(system: str, max_data_papers: int = 25) -> dict:
     """Assessments of an exact chemical system (papers behind its TDB files or read by ORCHID) with the original
     data papers each used (works printed as the source of the extracted values, with value counts and evidence
     classes), the TDB files, reassessment links (citation+same-system) and paper counts by role. max_data_papers
-    caps the data-paper list per assessment (flag data_papers_truncated)."""
+    caps the data-paper list per assessment (flag data_papers_truncated).
+    """
     return _call(orchid().get_assessment_evidence, system=system, max_data_papers=max_data_papers)
 
 
@@ -230,7 +258,8 @@ def compare_to_dft(system: str, default_subset_only: bool = False, fields: Field
     """Literature formation enthalpies vs Materials Project vs OQMD for the compounds of a system, with residuals
     (DFT - literature), MAE over the default experimental subset, and the DFT hull vertices of both sources.
     fields: "summary" (default; per literature value: id, value, evidence class, accepted, phase, T, citation, DOI,
-    page, quote <= 240 chars, table, residuals) or "full" (method, cited sources, flags, DFT point details)."""
+    page, quote <= 240 chars, table, residuals) or "full" (method, cited sources, flags, DFT point details).
+    """
     return _call(orchid().compare_to_dft, system=system, default_subset_only=default_subset_only, fields=fields)
 
 
@@ -242,7 +271,8 @@ def get_phase(system: str, phase: str, fields: Fields = "summary") -> dict:
     Strukturbericht, Pearson, space group), names by namespace, TDB models with their verbatim PHASE and CONSTITUENT
     statements, stability per calculated diagram, literature counts, first 5 reference DOIs, viewer URL.
     fields="full": the complete record (tdb_definition with TYPE_DEFINITIONs, parsed model and parameter counts,
-    all example references with citations, candidates)."""
+    all example references with citations, candidates).
+    """
     return _call(orchid().get_phase, system=system, phase=phase, fields=fields)
 
 
@@ -258,18 +288,29 @@ def search_phases(
     """Search the ORCHID phase registry (binary systems). elements: phases of systems containing all of them.
     name: substring of the phase name, TDB names, paper or corpus labels. prototype: prototype, Strukturbericht,
     Pearson symbol or structure-type id ("AuCu3", "L1_2" = "L12", "cP4"). tier: A | B | C | liquid | gas | none.
-    status: assigned | needs_review | unresolved_no_candidates. Paginate with offset; `total` counts all matches."""
-    return _call(orchid().search_phases, elements=elements, name=name, prototype=prototype, tier=tier, status=status, limit=limit, offset=offset)
+    status: assigned | needs_review | unresolved_no_candidates. Paginate with offset; `total` counts all matches.
+    """
+    return _call(
+        orchid().search_phases,
+        elements=elements,
+        name=name,
+        prototype=prototype,
+        tier=tier,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
 
 
 def get_structure_type(query: str) -> dict:
     """Crystal-structure types of the phase registry by id, prototype, Strukturbericht, Pearson symbol or space
     group ("AuCu3", "L1_2", "cP4", "Pm-3m", "221"): prototype, Strukturbericht, Pearson, space group, sources
-    (Hallstedt 2025 crystallographic table, standard tables), number of registry phases and example phase ids."""
+    (Hallstedt 2025 crystallographic table, standard tables), number of registry phases and example phase ids.
+    """
     return _call(orchid().get_structure_type, query=query)
 
 
-TOOLS: list[Callable[..., dict]] = [
+tool_functions: list[Callable[..., dict]] = [
     search_systems,
     get_system_data,
     get_invariant_reactions,
@@ -287,11 +328,15 @@ TOOLS: list[Callable[..., dict]] = [
     get_structure_type,
 ]
 
-RESOURCES = {
+resource_table = {
     "orchid://schema": ("schema", "ORCHID literature data schema (SCHEMA.md)", "text/markdown"),
     "orchid://dataset-card": ("dataset-card", "ORCHID dataset card (README + CITATION.cff)", "text/markdown"),
     "orchid://licence": ("licence", "ORCHID data licences and attributions (LICENSES.md, NOTICE.md)", "text/markdown"),
-    "orchid://bibliography-schema": ("bibliography-schema", "ORCHID bibliography schema (bibliography/SCHEMA.md)", "text/markdown"),
+    "orchid://bibliography-schema": (
+        "bibliography-schema",
+        "ORCHID bibliography schema (bibliography/SCHEMA.md)",
+        "text/markdown",
+    ),
 }
 
 
@@ -311,6 +356,14 @@ def _schema_for(tp: Any) -> dict[str, Any]:
 
 
 def tool_schema(fn: Callable[..., Any]) -> dict[str, Any]:
+    """JSON schema of a tool's parameters: types, required names and defaults.
+
+    Args:
+        fn (Callable[..., Any]): The tool function.
+
+    Returns:
+        An object schema with ``properties`` and ``required``.
+    """
     hints = typing.get_type_hints(fn)
     props: dict[str, Any] = {}
     required = []
@@ -325,9 +378,14 @@ def tool_schema(fn: Callable[..., Any]) -> dict[str, Any]:
 
 
 def tool_descriptions() -> list[dict[str, Any]]:
+    """Name, description and input schema of every tool, as advertised by the server.
+
+    Returns:
+        One dict per tool.
+    """
     return [
         {"name": fn.__name__, "description": inspect.cleandoc(fn.__doc__ or ""), "inputSchema": tool_schema(fn)}
-        for fn in TOOLS
+        for fn in tool_functions
     ]
 
 
@@ -339,22 +397,23 @@ def _sdk_server_class() -> tuple[Any, int]:
     mcp 1.x is still accepted.
     """
     try:
-        from mcp.server.mcpserver import MCPServer  # mcp >= 2
+        from mcp.server.mcpserver import MCPServer  # noqa: PLC0415 (optional SDK, mcp >= 2)
 
         return MCPServer, 2
     except ImportError:
-        from mcp.server.fastmcp import FastMCP  # mcp 1.x
+        from mcp.server.fastmcp import FastMCP  # noqa: PLC0415 (optional SDK, mcp 1.x)
 
         return FastMCP, 1
 
 
 def _raising(fn: Callable[..., dict], gen: int) -> Callable[..., str]:
     """Wrap a tool for the SDK: an ``{"error": ...}`` result becomes a tool error (``isError: true``), and a
-    result is returned as one compact JSON text block (the SDK would otherwise indent it, ~25% larger)."""
+    result is returned as one compact JSON text block (the SDK would otherwise indent it, ~25% larger).
+    """
     if gen >= 2:
-        from mcp.server.mcpserver.exceptions import ToolError
+        from mcp.server.mcpserver.exceptions import ToolError  # noqa: PLC0415 (optional SDK)
     else:
-        from mcp.server.fastmcp.exceptions import ToolError
+        from mcp.server.fastmcp.exceptions import ToolError  # noqa: PLC0415 (optional SDK)
 
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> str:
@@ -371,13 +430,13 @@ def build_fastmcp(host: str = "127.0.0.1", port: int = 8000) -> Any:
     """Build the server on the official MCP SDK (MCPServer in mcp 2.x, FastMCP in 1.x)."""
     cls, gen = _sdk_server_class()
     if gen >= 2:
-        server = cls(SERVER_NAME, instructions=INSTRUCTIONS, version=__version__)
+        server = cls(server_name, instructions=server_instructions, version=__version__)
     else:
-        server = cls(SERVER_NAME, instructions=INSTRUCTIONS, host=host, port=port)
+        server = cls(server_name, instructions=server_instructions, host=host, port=port)
     server._orchid_http = {"host": host, "port": port, "gen": gen}
-    for fn in TOOLS:
+    for fn in tool_functions:
         server.tool(structured_output=False)(_raising(fn, gen))
-    for uri, (key, desc, mime) in RESOURCES.items():
+    for uri, (key, desc, mime) in resource_table.items():
 
         def _make(k: str, d: str) -> Callable[[], str]:
             def read() -> str:
@@ -409,94 +468,242 @@ def run_sdk(server: Any, transport: str) -> None:
 
 
 # --------------------------------------------------- built-in stdio fallback
-PROTOCOL_VERSION = "2025-06-18"
+protocol_version = "2025-06-18"
+
+
+def _ok(mid: Any, result: Any) -> dict[str, Any]:
+    """JSON-RPC success response for one request.
+
+    Args:
+        mid (Any): Request id, echoed back.
+        result (Any): Result payload.
+
+    Returns:
+        The response object.
+    """
+    return {"jsonrpc": "2.0", "id": mid, "result": result}
+
+
+def _err(mid: Any, code: int, message: str) -> dict[str, Any]:
+    """JSON-RPC error response for one request.
+
+    Args:
+        mid (Any): Request id, echoed back.
+        code (int): JSON-RPC error code.
+        message (str): Human-readable message.
+
+    Returns:
+        The response object.
+    """
+    return {"jsonrpc": "2.0", "id": mid, "error": {"code": code, "message": message}}
+
+
+def _rpc_initialize(mid: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """Answer initialize with the protocol version, capabilities and instructions.
+
+    Args:
+        mid (Any): Request id.
+        params (dict[str, Any]): Request parameters; the client's protocol version is echoed when given.
+
+    Returns:
+        The response object.
+    """
+    return _ok(
+        mid,
+        {
+            "protocolVersion": params.get("protocolVersion") or protocol_version,
+            "capabilities": {"tools": {}, "resources": {}, "prompts": {}},
+            "serverInfo": {"name": server_name, "version": __version__},
+            "instructions": server_instructions,
+        },
+    )
+
+
+def _rpc_ping(mid: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """Answer ping with an empty result.
+
+    Args:
+        mid (Any): Request id.
+        params (dict[str, Any]): Unused.
+
+    Returns:
+        The response object.
+    """
+    del params
+    return _ok(mid, {})
+
+
+def _rpc_tools_list(mid: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """Answer tools/list with the tool descriptions.
+
+    Args:
+        mid (Any): Request id.
+        params (dict[str, Any]): Unused.
+
+    Returns:
+        The response object.
+    """
+    del params
+    return _ok(mid, {"tools": tool_descriptions()})
+
+
+def _rpc_tools_call(mid: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """Answer tools/call: validate the arguments, run the tool, return its JSON as text and as structured content.
+
+    Args:
+        mid (Any): Request id.
+        params (dict[str, Any]): Request parameters with ``name`` and ``arguments``.
+
+    Returns:
+        The response object; tool errors and bad arguments come back with ``isError`` set.
+    """
+    by_name = {fn.__name__: fn for fn in tool_functions}
+    fn = by_name.get(params.get("name"))
+    if fn is None:
+        return _err(mid, -32602, f"unknown tool {params.get('name')!r}")
+    args = params.get("arguments") or {}
+    bad = set(args) - set(inspect.signature(fn).parameters)
+    if bad:
+        return _ok(mid, {"content": [{"type": "text", "text": f"unknown arguments: {sorted(bad)}"}], "isError": True})
+    try:
+        result = fn(**args)
+    except TypeError as exc:
+        return _ok(mid, {"content": [{"type": "text", "text": f"bad arguments: {exc}"}], "isError": True})
+    text = json.dumps(result, ensure_ascii=False)
+    return _ok(
+        mid,
+        {"content": [{"type": "text", "text": text}], "structuredContent": result, "isError": "error" in result},
+    )
+
+
+def _rpc_resources_list(mid: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """Answer resources/list with the documentation resources.
+
+    Args:
+        mid (Any): Request id.
+        params (dict[str, Any]): Unused.
+
+    Returns:
+        The response object.
+    """
+    del params
+    return _ok(
+        mid,
+        {"resources": [{"uri": u, "name": k, "description": d, "mimeType": m} for u, (k, d, m) in resource_table.items()]},
+    )
+
+
+def _rpc_resources_read(mid: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """Answer resources/read with the text of one documentation resource.
+
+    Args:
+        mid (Any): Request id.
+        params (dict[str, Any]): Request parameters with ``uri``.
+
+    Returns:
+        The response object, or an error for an unknown URI.
+    """
+    uri = params.get("uri")
+    if uri not in resource_table:
+        return _err(mid, -32602, f"unknown resource {uri!r}")
+    key, _, mime = resource_table[uri]
+    return _ok(mid, {"contents": [{"uri": uri, "mimeType": mime, "text": orchid().resource_text(key)}]})
+
+
+def _rpc_prompts_list(mid: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """Answer prompts/list with the cite_orchid prompt.
+
+    Args:
+        mid (Any): Request id.
+        params (dict[str, Any]): Unused.
+
+    Returns:
+        The response object.
+    """
+    del params
+    return _ok(
+        mid,
+        {
+            "prompts": [
+                {
+                    "name": "cite_orchid",
+                    "description": "How to cite ORCHID and the original sources of each value",
+                    "arguments": [{"name": "topic", "description": "optional topic", "required": False}],
+                }
+            ]
+        },
+    )
+
+
+def _rpc_prompts_get(mid: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """Answer prompts/get with the rendered cite_orchid prompt.
+
+    Args:
+        mid (Any): Request id.
+        params (dict[str, Any]): Request parameters with ``name`` and optional ``arguments``.
+
+    Returns:
+        The response object, or an error for an unknown prompt name.
+    """
+    if params.get("name") != "cite_orchid":
+        return _err(mid, -32602, f"unknown prompt {params.get('name')!r}")
+    topic = (params.get("arguments") or {}).get("topic", "")
+    return _ok(
+        mid,
+        {
+            "description": "How to cite ORCHID and the original sources",
+            "messages": [{"role": "user", "content": {"type": "text", "text": cite_orchid_prompt(topic)}}],
+        },
+    )
+
+
+_rpc_handlers: dict[str, Any] = {
+    "initialize": _rpc_initialize,
+    "ping": _rpc_ping,
+    "tools/list": _rpc_tools_list,
+    "tools/call": _rpc_tools_call,
+    "resources/list": _rpc_resources_list,
+    "resources/read": _rpc_resources_read,
+    "prompts/list": _rpc_prompts_list,
+    "prompts/get": _rpc_prompts_get,
+}
 
 
 def handle_request(msg: dict[str, Any]) -> dict[str, Any] | None:
-    """Handle one JSON-RPC message of the MCP protocol (fallback server)."""
+    """Handle one JSON-RPC message of the MCP protocol (fallback server).
+
+    Args:
+        msg (dict[str, Any]): Decoded request. A message without an ``id`` is a notification.
+
+    Returns:
+        The response object, or None for a notification.
+    """
     mid = msg.get("id")
     method = msg.get("method", "")
     params = msg.get("params") or {}
     if mid is None:  # notification
         return None
-
-    def ok(result: Any) -> dict[str, Any]:
-        return {"jsonrpc": "2.0", "id": mid, "result": result}
-
-    def err(code: int, message: str) -> dict[str, Any]:
-        return {"jsonrpc": "2.0", "id": mid, "error": {"code": code, "message": message}}
-
-    if method == "initialize":
-        return ok(
-            {
-                "protocolVersion": params.get("protocolVersion") or PROTOCOL_VERSION,
-                "capabilities": {"tools": {}, "resources": {}, "prompts": {}},
-                "serverInfo": {"name": SERVER_NAME, "version": __version__},
-                "instructions": INSTRUCTIONS,
-            }
-        )
-    if method == "ping":
-        return ok({})
-    if method == "tools/list":
-        return ok({"tools": tool_descriptions()})
-    if method == "tools/call":
-        by_name = {fn.__name__: fn for fn in TOOLS}
-        fn = by_name.get(params.get("name"))
-        if fn is None:
-            return err(-32602, f"unknown tool {params.get('name')!r}")
-        args = params.get("arguments") or {}
-        allowed = set(inspect.signature(fn).parameters)
-        bad = set(args) - allowed
-        if bad:
-            return ok({"content": [{"type": "text", "text": f"unknown arguments: {sorted(bad)}"}], "isError": True})
-        try:
-            result = fn(**args)
-        except TypeError as exc:
-            return ok({"content": [{"type": "text", "text": f"bad arguments: {exc}"}], "isError": True})
-        text = json.dumps(result, ensure_ascii=False)
-        return ok({"content": [{"type": "text", "text": text}], "structuredContent": result, "isError": "error" in result})
-    if method == "resources/list":
-        return ok({"resources": [{"uri": u, "name": k, "description": d, "mimeType": m} for u, (k, d, m) in RESOURCES.items()]})
-    if method == "resources/read":
-        uri = params.get("uri")
-        if uri not in RESOURCES:
-            return err(-32602, f"unknown resource {uri!r}")
-        key, _, mime = RESOURCES[uri]
-        return ok({"contents": [{"uri": uri, "mimeType": mime, "text": orchid().resource_text(key)}]})
-    if method == "prompts/list":
-        return ok(
-            {
-                "prompts": [
-                    {
-                        "name": "cite_orchid",
-                        "description": "How to cite ORCHID and the original sources of each value",
-                        "arguments": [{"name": "topic", "description": "optional topic", "required": False}],
-                    }
-                ]
-            }
-        )
-    if method == "prompts/get":
-        if params.get("name") != "cite_orchid":
-            return err(-32602, f"unknown prompt {params.get('name')!r}")
-        topic = (params.get("arguments") or {}).get("topic", "")
-        return ok(
-            {
-                "description": "How to cite ORCHID and the original sources",
-                "messages": [{"role": "user", "content": {"type": "text", "text": cite_orchid_prompt(topic)}}],
-            }
-        )
-    return err(-32601, f"method not found: {method}")
+    handler = _rpc_handlers.get(method) if isinstance(method, str) else None
+    if handler is None:
+        return _err(mid, -32601, f"method not found: {method}")
+    return handler(mid, params)
 
 
 def run_fallback_stdio(stdin: Any = None, stdout: Any = None) -> None:
+    """Serve the built-in JSON-RPC protocol over line-delimited stdin and stdout.
+
+    Args:
+        stdin (Any): Text stream to read requests from (defaults to ``sys.stdin``).
+        stdout (Any): Text stream to write responses to (defaults to ``sys.stdout``).
+    """
     stdin = stdin or sys.stdin
     stdout = stdout or sys.stdout
     for line in stdin:
-        line = line.strip()
-        if not line:
+        text = line.strip()
+        if not text:
             continue
         try:
-            msg = json.loads(line)
+            msg = json.loads(text)
         except json.JSONDecodeError:
             resp: dict[str, Any] | None = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}}
         else:
@@ -510,6 +717,11 @@ def run_fallback_stdio(stdin: Any = None, stdout: Any = None) -> None:
 
 
 def sdk_available() -> bool:
+    """Whether the official MCP SDK can be imported.
+
+    Returns:
+        True when a server class of the SDK is available.
+    """
     try:
         _sdk_server_class()
     except ImportError:
@@ -518,6 +730,14 @@ def sdk_available() -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Command-line entry point: parse options, then run the server on stdio or HTTP.
+
+    Args:
+        argv (list[str] | None): Arguments without the program name (defaults to ``sys.argv``).
+
+    Returns:
+        Process exit status.
+    """
     ap = argparse.ArgumentParser(prog="orchid-mcp", description="ORCHID MCP server (CALPHAD data with provenance)")
     ap.add_argument("--transport", choices=["stdio", "http"], default="stdio", help="stdio (default) or streamable HTTP")
     ap.add_argument("--host", default="127.0.0.1", help="HTTP bind address (default 127.0.0.1)")

@@ -5,11 +5,13 @@ from __future__ import annotations
 import hashlib
 import math
 import statistics
-from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .constants import quote_max
 from .report import report_url_for
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 n_folds = 5  # modulus of the machine-learning splits (orchid-project.org tools/ml_folds.py)
 budget_components = ("sigma_printed", "sigma_reading", "sigma_composition", "sigma_scatter", "sigma_conversion")
@@ -227,11 +229,7 @@ def _review_corrections(r: dict[str, Any]) -> list[dict[str, Any]]:
     Returns:
         The matching corrections (empty when there are none).
     """
-    return [
-        c
-        for c in r.get("corrections") or []
-        if isinstance(c, dict) and c.get("rule") == "source_adjudicated_human_review"
-    ]
+    return [c for c in r.get("corrections") or [] if isinstance(c, dict) and c.get("rule") == "source_adjudicated_human_review"]
 
 
 def summarize_record(r: dict[str, Any]) -> dict[str, Any]:

@@ -40,25 +40,25 @@ def grid_phase(doc: dict[str, Any], x: float, T: float) -> dict[str, Any]:  # no
     rows, labels = g.get("rows") or [], g.get("labels") or []
     if not rows:
         return {"error": "no stored equilibrium grid for this diagram"}
-    xs, T0, dT = float(g["x_step"]), float(g["T0"]), float(g["dT"])
+    xs, t0, dt = float(g["x_step"]), float(g["T0"]), float(g["dT"])
     npts = int(g.get("x_points") or round(1 / xs) + 1)
     if not (0.0 <= x <= 1.0):
         return {"error": "x must be a mole fraction in [0, 1]"}
-    i = round((T - T0) / dT)
+    i = round((T - t0) / dt)
     if i < 0 or i >= len(rows):
-        return {"error": f"T outside the stored grid ({T0}..{T0 + dT * (len(rows) - 1)} K)"}
+        return {"error": f"T outside the stored grid ({t0}..{t0 + dt * (len(rows) - 1)} K)"}
     j = min(npts - 1, max(0, round(x / xs)))
     label = _grid_label(rows[i], j, labels)
     return {
         "x_requested": x,
         "T_requested_K": T,
         "grid_x": round(j * xs, 6),
-        "grid_T_K": T0 + i * dT,
+        "grid_T_K": t0 + i * dt,
         "x_component": doc.get("x_component"),
         "stable_phases": label.split("+") if label else None,
         "label": label,
         "note": "nearest node of the stored pycalphad equilibrium grid (" + str(g.get("note", "")) + "); "
-        f"resolution dx={xs}, dT={dT} K. Calculated (evidence class: model), not measured.",
+        f"resolution dx={xs}, dT={dt} K. Calculated (evidence class: model), not measured.",
     }
 
 
@@ -199,7 +199,13 @@ class DiagramsTools:
         }
 
     def get_phase_diagram(
-        self, *, system: str, assessment: str | None, x: float | None, T: float | None, fields: str  # noqa: N803
+        self,
+        *,
+        system: str,
+        assessment: str | None,
+        x: float | None,
+        T: float | None,  # noqa: N803 (kelvin, public name)
+        fields: str,
     ) -> dict[str, Any]:
         """Calculated binary phase diagram(s) of a system; optionally the stable phases at (x, T).
 
@@ -274,7 +280,9 @@ class DiagramsTools:
         result: dict[str, Any] = {"system": sid, "source": source}
         lit_recs: list[dict[str, Any]] = []
         if source in ("literature", "both"):
-            lit_recs = self._literature_part(result, sid, accepted_only, limit, offset, fields)
+            lit_recs = self._literature_part(
+                result, sid=sid, accepted_only=accepted_only, limit=limit, offset=offset, fields=fields
+            )
         if source in ("calculated", "both"):
             result["calculated"] = self._calculated_part(sid, assessment, lit_recs, fields)
             result["matching_rule"] = matching_rule
@@ -283,7 +291,7 @@ class DiagramsTools:
         return self._core.wrap(result)
 
     def _literature_part(
-        self, result: dict[str, Any], sid: str, accepted_only: bool, limit: int, offset: int, fields: str
+        self, result: dict[str, Any], *, sid: str, accepted_only: bool, limit: int, offset: int, fields: str
     ) -> list[dict[str, Any]]:
         """Fill the literature block of an invariant-reaction result and return all matching records.
 
@@ -380,7 +388,7 @@ def _literature_matches(
         inv (dict[str, Any]): Calculated invariant (``T`` in kelvin).
         phases (set[str]): Calculated phase names with their ``#n`` suffixes removed.
         lit_recs (list[dict[str, Any]]): Literature invariant records (expanded).
-        fields (str): Summary mode keeps only id, evidence class, T and dT of the best matches.
+        fields (str): Summary mode keeps only id, evidence class, T and dt of the best matches.
 
     Returns:
         At most ``invariant_match_max`` matches (``invariant_match_summary`` in summary mode).
