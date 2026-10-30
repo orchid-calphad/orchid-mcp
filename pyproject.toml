@@ -27,6 +27,9 @@ Data = "https://data.orchid-project.org"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+orchid_mcp = ["py.typed"]  # PEP 561: the package is typed
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
