@@ -167,6 +167,12 @@ ORCHID_TEST_DATA_DIR=~/projects/orchid-data ORCHID_TEST_SITE_DATA_DIR=~/projects
 Tests read local data only; network access fails the run. The stdio smoke test runs against both the built-in
 fallback and the SDK server (skipped if `mcp` is not installed).
 
+## Claude Code agent
+
+`.claude/agents/orchid-specialist.md` is a Claude Code subagent for ORCHID: it knows the data repositories, the tools
+above, the evidence classes and the citation rules. Copy it to `~/.claude/agents/` (or your project's `.claude/agents/`)
+to use it with `orchid-mcp` installed as shown in [Claude Code](#claude-code).
+
 ## Contributing
 
 See `CONTRIBUTING.md` (bugs, new tools, tests; MIT with a DCO sign-off) and the
