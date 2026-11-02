@@ -82,6 +82,22 @@ class TestFallbackProtocol(TestCase):
         assert replies[1]["error"]["code"] == -32600
         assert replies[2]["result"] == {}
 
+    def test_malformed_params_are_invalid_params(self):
+        """BL-017: malformed params give -32602 (invalid params), not -32603 (internal error)."""
+        cases = [
+            ("tools/call", ["not", "an", "object"]),
+            ("tools/call", {"name": ["not-a-string"]}),
+            ("tools/call", {"name": "search_systems", "arguments": ["not", "an", "object"]}),
+            ("resources/read", {"uri": ["unhashable"]}),
+            ("resources/read", "orchid://not-an-object"),
+            ("prompts/get", {"name": {"not": "a string"}}),
+            ("prompts/get", {"name": "cite_orchid", "arguments": "not an object"}),
+        ]
+        for method, params in cases:
+            with self.subTest(method=method, params=params):
+                resp = stdio.handle_request({"jsonrpc": "2.0", "id": 7, "method": method, "params": params})
+                assert resp["id"] == 7 and resp["error"]["code"] == -32602
+
     def test_console_streams_are_utf8_with_bare_lf(self):
         """The real process answers in UTF-8 with LF-only lines, whatever the OS console defaults are."""
         request = '{"jsonrpc": "2.0", "id": "éü", "method": "ping"}\n'.encode()

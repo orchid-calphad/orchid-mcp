@@ -223,6 +223,28 @@ _rpc_handlers: dict[str, Any] = {
 }
 
 
+def _params_problem(method: Any, params: Any) -> str | None:
+    """Describe what is wrong with the params of a request, or return None when they are acceptable.
+
+    Args:
+        method (Any): The request method.
+        params (Any): The decoded ``params`` value (an empty object when the request had none).
+
+    Returns:
+        A message for the -32602 reply, or None.
+    """
+    if not isinstance(params, dict):
+        return "params must be an object"
+    if method in ("tools/call", "prompts/get"):
+        if not isinstance(params.get("name"), str):
+            return "params.name must be a string"
+        if params.get("arguments") is not None and not isinstance(params["arguments"], dict):
+            return "params.arguments must be an object"
+    if method == "resources/read" and not isinstance(params.get("uri"), str):
+        return "params.uri must be a string"
+    return None
+
+
 def handle_request(msg: Any) -> dict[str, Any] | None:
     """Handle one JSON-RPC message of the MCP protocol (fallback server).
 
@@ -237,9 +259,14 @@ def handle_request(msg: Any) -> dict[str, Any] | None:
         return _err(None, -32600, "invalid request")
     mid = msg.get("id")
     method = msg.get("method", "")
-    params = msg.get("params") or {}
+    params = msg.get("params")
     if mid is None:  # notification
         return None
+    # Malformed params are the client's error (-32602 invalid params), not an internal one.
+    params = {} if params is None else params
+    problem = _params_problem(method, params)
+    if problem:
+        return _err(mid, -32602, problem)
     handler = _rpc_handlers.get(method) if isinstance(method, str) else None
     if handler is None:
         return _err(mid, -32601, f"method not found: {method}")

@@ -4,7 +4,7 @@ import gzip
 import json
 from unittest import TestCase
 
-from conftest import OrchidTestCase, data_dir
+from conftest import OrchidTestCase, data_dir, local_data_skip_reason
 
 from orchid_mcp.tools import summarize_record
 
@@ -14,8 +14,11 @@ class TestReleaseReview(TestCase):
 
     def test_release_review_and_identity_survive_summary(self):
         """Every human-reviewed correction, evidence identity and duplicate in the release survives the summary."""
+        release = data_dir / "literature/orchid-literature.jsonl.gz"
+        if not release.is_file():
+            self.skipTest(local_data_skip_reason)
         reviewed = identities = duplicates = 0
-        with gzip.open(data_dir / "literature/orchid-literature.jsonl.gz", "rt", encoding="utf-8") as stream:
+        with gzip.open(release, "rt", encoding="utf-8") as stream:
             for line in stream:
                 record = json.loads(line)
                 corrections = [c for c in record.get("corrections", []) if c.get("rule") == "source_adjudicated_human_review"]
