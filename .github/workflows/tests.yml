@@ -11,6 +11,7 @@ concurrency:  # a newer push cancels the superseded run of the same branch or pu
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v7  # uv is pinned to the version used for uv.lock
@@ -36,6 +37,7 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.12"
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10  # a hung test fails in minutes (a green run takes under a minute)
     defaults:
       run:
         shell: bash
