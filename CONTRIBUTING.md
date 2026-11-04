@@ -12,12 +12,32 @@ Thank you for helping. This repository is the MCP server and the OpenAPI descrip
 - **Code**: fork, branch, and open a pull request. Keep the package free of runtime dependencies (the `mcp` SDK is
   optional), keep every value's provenance (citation, DOI, page, quote or table locator, evidence class) in tool
   results, never average across evidence classes, and never make the server post or send anything on the user's
-  behalf. Add tests; run them with local data:
+  behalf. Add tests; run them with local data.
+
+Development with [uv](https://docs.astral.sh/uv/) (`uv.lock` pins every dependency; `uv sync` creates `.venv`):
+
+```bash
+uv sync --extra mcp
+ORCHID_TEST_DATA_DIR=/path/to/orchid-data ORCHID_TEST_SITE_DATA_DIR=/path/to/orchid-project.org/data uv run pytest
+uv run ruff check . && uv run ruff format --check .
+```
+
+Or with pip, in a dedicated environment (no uv needed):
 
 ```bash
 .venv/bin/pip install -e '.[mcp,test]'
-ORCHID_TEST_DATA_DIR=~/projects/orchid-data ORCHID_TEST_SITE_DATA_DIR=~/projects/orchid-project.org/data .venv/bin/python -m pytest
+ORCHID_TEST_DATA_DIR=/path/to/orchid-data ORCHID_TEST_SITE_DATA_DIR=/path/to/orchid-project.org/data .venv/bin/python -m pytest
 ```
+
+The checks CI runs (pinned ruff, same as `.github/workflows/tests.yml`):
+
+```bash
+.venv/bin/pip install "ruff==0.16.8"
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
+```
+
+  On Windows use `.venv\Scripts\python` and clone the data repositories with `git clone -c core.autocrlf=false`:
+  the served `.tdb` files are checksummed byte for byte, and CRLF conversion changes the hash.
 
   Without local data the data-dependent tests are skipped (CI runs the rest); tests must never use the network.
 

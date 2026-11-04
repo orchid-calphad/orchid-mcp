@@ -24,8 +24,29 @@ orchid-mcp = "orchid_mcp.server:main"
 Homepage = "https://orchid-project.org"
 Data = "https://data.orchid-project.org"
 
+[dependency-groups]
+dev = ["pytest==9.1.1", "pyyaml", "ruff==0.16.8"]  # the versions CI installs (.github/workflows/tests.yml)
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+orchid_mcp = ["py.typed"]  # PEP 561: the package is typed
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 130
+force-exclude = true
+
+[tool.ruff.lint]
+select = ["A", "B", "C4", "D", "E", "ERA", "F", "FA", "I", "ICN", "N", "PL", "PTH", "Q", "SIM", "TC", "UP", "W"]
+ignore = ["E501", "PLR0913", "PLR2004"]  # long lines and magic-value comparisons are judgment calls, not lint failures
+pydocstyle.convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"src/orchid_mcp/server.py" = ["D205", "PLR0917", "A002", "N803"]  # MCP tool functions: parameter names, positional order and docstrings are the advertised protocol schema and descriptions, so they stay as they are
+
+[tool.ruff.format]
+quote-style = "double"

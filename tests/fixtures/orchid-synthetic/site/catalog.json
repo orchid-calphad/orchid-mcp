@@ -1,0 +1,25 @@
+{
+ "records": [
+  {
+   "name": "AlNi-05Mie.tdb",
+   "elements": "AL-NI",
+   "n_elements": 2,
+   "tier": "bundled",
+   "license": "CC BY 4.0",
+   "license_status": "confirmed",
+   "source_url": "https://example.org/synthetic",
+   "local_path": "databases/sgte-binary/AlNi-05Mie.tdb",
+   "download_url": "https://example.org/synthetic.tdb"
+  },
+  {
+   "name": "NiTi-99Tan.tdb",
+   "elements": "NI-TI",
+   "n_elements": 2,
+   "tier": "fetched",
+   "license": "unclear",
+   "license_status": "unclear",
+   "source_url": "https://example.org/synthetic-fetched",
+   "download_url": "https://example.org/synthetic-fetched.tdb"
+  }
+ ]
+}

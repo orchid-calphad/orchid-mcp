@@ -41,18 +41,18 @@ orchid-mcp --transport http --port 8000      # streamable HTTP at http://127.0.0
 ### Claude Code
 
 ```bash
-# as installed on the Mac Studio: user scope, offline, from local checkouts, using the dedicated venv
+# user scope, offline, from local checkouts, using the dedicated venv (replace the placeholder paths)
 claude mcp add --scope user orchid \
-  -e ORCHID_DATA_DIR=$HOME/projects/orchid-data \
-  -e ORCHID_SITE_DATA_DIR=$HOME/projects/orchid-project.org/data \
-  -- $HOME/projects/orchid-mcp/.venv/bin/orchid-mcp
+  -e ORCHID_DATA_DIR=/path/to/orchid-data \
+  -e ORCHID_SITE_DATA_DIR=/path/to/orchid-project.org/data \
+  -- /path/to/orchid-mcp/.venv/bin/orchid-mcp
 
 # online (data fetched from data.orchid-project.org and cached)
 claude mcp add orchid -- orchid-mcp
 # offline, from local checkouts
 claude mcp add orchid \
-  -e ORCHID_DATA_DIR=$HOME/projects/orchid-data \
-  -e ORCHID_SITE_DATA_DIR=$HOME/projects/orchid-project.org/data \
+  -e ORCHID_DATA_DIR=/path/to/orchid-data \
+  -e ORCHID_SITE_DATA_DIR=/path/to/orchid-project.org/data \
   -- orchid-mcp
 # over HTTP (server started separately)
 claude mcp add --transport http orchid http://127.0.0.1:8000/mcp
@@ -68,8 +68,8 @@ Use the absolute path of `orchid-mcp` (e.g. `$(which orchid-mcp)`) if it is not 
     "orchid": {
       "command": "/absolute/path/to/orchid-mcp",
       "env": {
-        "ORCHID_DATA_DIR": "/Users/you/projects/orchid-data",
-        "ORCHID_SITE_DATA_DIR": "/Users/you/projects/orchid-project.org/data"
+        "ORCHID_DATA_DIR": "/path/to/orchid-data",
+        "ORCHID_SITE_DATA_DIR": "/path/to/orchid-project.org/data"
       }
     }
   }
@@ -84,15 +84,15 @@ Omit `env` to use the online data.
 |---|---|
 | `search_systems(elements, text, exact, limit=50, offset, fields)` | systems with value counts by evidence class and calculated assessments (`full`: property groups, citations, viewer URLs) |
 | `get_system_data(system, property_group, evidence_class, accepted_only=True, limit=50, offset, property, fields, compact)` | literature values; `full`: complete records with an expanded `source` (citation, DOI, page, quote or table locator) |
-| `get_invariant_reactions(system, source="literature"\|"calculated"\|"both", assessment, limit=50, offset, fields)` | literature invariants (paged) and calculated invariants per SGTE assessment, with exact phase-set matches and dT |
-| `get_formation_enthalpy(formula, fields)` | literature HM_FORM (kJ/mol-atom) + Materials Project and OQMD entries at that composition + per-class summaries |
+| `get_invariant_reactions(system, source, assessment, accepted_only=True, limit=50, offset, fields)` | literature invariants (paged; `source` = `literature`, `calculated` or `both`) and calculated invariants per SGTE assessment, with exact phase-set matches and dT |
+| `get_formation_enthalpy(formula, accepted_only=True, include_higher_order_systems=True, fields)` | literature HM_FORM (kJ/mol-atom) + Materials Project and OQMD entries at that composition + per-class summaries |
 | `get_phase_diagram(system, assessment, x, T, fields)` | TDB file, SHA-256, assessment citation/DOI, phases, invariants, viewer URL (`full`: region summary, grid); stable phases at (x, T) from the stored grid |
-| `list_tdb_files(elements, exact, tier, limit=50, offset, fields)` / `get_tdb(file)` | licence, tier, SHA-256, download URL (`full`: whole catalog entry); file content **only** for bundled, confirmed-licence files |
+| `list_tdb_files(elements, exact, tier, limit=50, offset, fields)` / `get_tdb(file, include_content=True)` | licence, tier, SHA-256, download URL (`full`: whole catalog entry); file content **only** for bundled, confirmed-licence files (`include_content=False`: metadata only) |
 | `get_paper(doi, fields)` | bibliographic record, systems, number of values, experimental-context items with quotes, and the bibliography entry: roles, evidence summary, Crossref metadata, open-access licence (Crossref `license` only), relation counts (`full`: whole record and every relation with provenance). Accepts a DOI, `doi:`/`nodoi:` id, literature id or bibliography key |
 | `search_papers(system, elements, role, property, evidence_class, year_from, year_to, text, limit=50, offset)` | papers of the bibliography (every paper ORCHID knows) by exact system, elements, role (`corpus_assessment_read`, `cited_original_source`, `tdb_source_assessment`, `handbook_diagram_source`, `discovery_lead`, ...), property code, evidence class, years, title/author text |
 | `get_paper_relations(doi, relation, direction="both", limit=100, offset)` | typed edges with provenance: `cites`, `used_in_assessment`, `models_system_in_tdb`, `reassesses` (citation+same-system), `handbook_reproduces`, `cited_by_crossref` — e.g. which original papers an assessment used, which assessments used a paper, a system's reassessment chain |
 | `get_assessment_evidence(system, max_data_papers=25)` | assessments of an exact system with the data papers each used (value counts, evidence classes), TDB files and reassessment links |
-| `compare_to_dft(system, fields)` | literature vs MP vs OQMD formation enthalpies with residuals and the DFT hull vertices |
+| `compare_to_dft(system, default_subset_only=False, fields)` | literature vs MP vs OQMD formation enthalpies with residuals and the DFT hull vertices (`default_subset_only`: only the default experimental subset) |
 | `get_phase(system, phase, fields)` | one phase of the phase registry by id, namespaced name (`tdb:`, `paper:`, `corpus:`, `mp:`, `oqmd:`) or label (`L12_FCC`, `NI3TI`): structure (tier A/B/C), names, TDB models with verbatim PHASE/CONSTITUENT lines, stability, first 5 reference DOIs (`full`: `tdb_definition`, all references, candidates) |
 | `search_phases(elements, name, prototype, tier, status, limit=50, offset)` | phases filtered by elements, name/label, prototype / Strukturbericht / Pearson (`L1_2` = `L12`), tier (A, B, C, liquid, gas, none) |
 | `get_structure_type(query)` | structure types by id, prototype, Strukturbericht, Pearson or space group, with sources, number of registry phases and example phase ids |
@@ -157,11 +157,23 @@ served (only their original-source links).
 `/phases/registry.json` (compact index), `/phases/systems/{SYS}.json` (full phase records),
 `/phases/structure_types.json` and, on `https://orchid-project.org/data`, `/catalog.json` and `/databases/{collection}/{file}`.
 
+`openapi/tools_manifest.json` lists every tool with its parameters and verification level (`smoke` or `golden`);
+regenerate it with `orchid-mcp --list-tools > openapi/tools_manifest.json` after changing a tool.
+
 ## Tests
+
+The data-dependent tests need two local checkouts, named by two environment variables that are set first:
+`ORCHID_TEST_DATA_DIR` (an `orchid-data` checkout) and `ORCHID_TEST_SITE_DATA_DIR` (the `orchid-project.org/data`
+folder). Without them those tests are skipped.
+
+With [uv](https://docs.astral.sh/uv/): `uv sync --extra mcp` once, then
+`ORCHID_TEST_DATA_DIR=/path/to/orchid-data ORCHID_TEST_SITE_DATA_DIR=/path/to/orchid-project.org/data uv run pytest`.
+
+With pip:
 
 ```bash
 .venv/bin/pip install -e '.[mcp,test]'
-ORCHID_TEST_DATA_DIR=~/projects/orchid-data ORCHID_TEST_SITE_DATA_DIR=~/projects/orchid-project.org/data .venv/bin/python -m pytest
+ORCHID_TEST_DATA_DIR=/path/to/orchid-data ORCHID_TEST_SITE_DATA_DIR=/path/to/orchid-project.org/data .venv/bin/python -m pytest
 ```
 
 Tests read local data only; network access fails the run. The stdio smoke test runs against both the built-in

@@ -1,0 +1,90 @@
+{
+ "tdb": "AlNi-05Mie.tdb",
+ "sha256": "67139cc029a4f5e6c534589840317a0eeb592373ae894e127d0b52b690bd78d2",
+ "components": [
+  "AL",
+  "NI"
+ ],
+ "x_component": "NI",
+ "status": "ok",
+ "T_range": [
+  300,
+  2000
+ ],
+ "phases": [
+  "FCC_A1",
+  "LIQUID"
+ ],
+ "engine": "pycalphad",
+ "invariants": [
+  {
+   "T": 1638.0,
+   "points": [
+    {
+     "phase": "LIQUID#1"
+    },
+    {
+     "phase": "FCC_A1"
+    }
+   ]
+  }
+ ],
+ "regions": [
+  {
+   "phase": "LIQUID",
+   "x": [
+    0.1,
+    0.2
+   ],
+   "T": [
+    1600,
+    1700
+   ]
+  },
+  {
+   "phase": "FCC_A1",
+   "x": [
+    0.2,
+    0.3
+   ],
+   "T": [
+    1600,
+    1700
+   ]
+  }
+ ],
+ "grid": {
+  "rows": [
+   [
+    [
+     0,
+     11
+    ]
+   ],
+   [
+    [
+     1,
+     4
+    ],
+    [
+     0,
+     7
+    ]
+   ]
+  ],
+  "labels": [
+   "FCC_A1",
+   "LIQUID"
+  ],
+  "x_step": 0.1,
+  "T0": 300,
+  "dT": 100,
+  "x_points": 11,
+  "note": "synthetic grid"
+ },
+ "original_source": {
+  "citation": "Synthetic Mie (2005)",
+  "doi": "10.0000/synthetic-mie05",
+  "url": "https://example.org/synthetic"
+ }
+}
