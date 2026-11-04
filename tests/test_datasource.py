@@ -9,7 +9,7 @@ from orchid_mcp.datasource import DataSource, DataSourceError, NotFound
 
 def test_local_and_traversal(tmp_path):
     (tmp_path / "a").mkdir()
-    (tmp_path / "a" / "x.json").write_text('{"k": 1}')
+    (tmp_path / "a" / "x.json").write_text('{"k": 1}', newline="\n")
     ds = DataSource(tmp_path)
     assert ds.read_json("a/x.json") == {"k": 1}
     assert ds.exists("a/x.json") and not ds.exists("a/y.json")
@@ -61,7 +61,7 @@ def test_read_json_wraps_recursion_error(tmp_path, monkeypatch):
     def too_deep(*_a, **_k):
         raise RecursionError("maximum recursion depth exceeded")
 
-    (tmp_path / "deep.json").write_text("[[]]")
+    (tmp_path / "deep.json").write_text("[[]]", newline="\n")
     monkeypatch.setattr(dsmod.json, "loads", too_deep)
     with pytest.raises(DataSourceError):
         DataSource(tmp_path).read_json("deep.json")
